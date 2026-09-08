@@ -10,6 +10,12 @@
     "ios": {
       "supportsTablet": true
     },
+    "android": {
+      "package": "com.slaskillup.student",
+      "adaptiveIcon": {
+        "backgroundColor": "#14217f"
+      }
+    },
     "web": {
       "bundler": "metro"
     }
