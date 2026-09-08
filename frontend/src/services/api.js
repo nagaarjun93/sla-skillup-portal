@@ -23,11 +23,14 @@ const getBaseUrl = () => {
   }
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return 'https://sla-skillup-portal.onrender.com/api';
+      }
       return `http://${window.location.hostname}:5002/api`;
     }
     return 'http://localhost:5002/api';
   }
-  return `http://${LOCAL_HOST_IP}:5002/api`;
+  return 'https://sla-skillup-portal.onrender.com/api';
 };
 
 const API_BASE_URL = getBaseUrl();

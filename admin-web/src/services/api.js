@@ -4,8 +4,10 @@ const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  if (typeof window !== 'undefined' && window.location && window.location.origin.includes(':5002')) {
-    return '/api';
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return 'https://sla-skillup-portal.onrender.com/api';
+    }
   }
   return 'http://localhost:5002/api';
 };
