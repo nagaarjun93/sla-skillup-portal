@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "SLA SkillUp - NMA Aptitude Portal",
+    "slug": "sla-skillup-aptitude",
+    "version": "1.0.0",
+    "sdkVersion": "57.0.0",
+    "orientation": "portrait",
+    "scheme": "nmaaptitude",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

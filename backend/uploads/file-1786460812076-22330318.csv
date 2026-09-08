@@ -1,0 +1,21 @@
+question_text,category,topic,option_a,option_b,option_c,option_d,correct_option_key,explanation
+What is 25 × 25 using the Vedic Math method?,Vedic Math,Multiplication,625,650,525,600,A,25 × 25 = 625.
+What is 35 × 35?,Vedic Math,Multiplication,1225,1250,1125,1325,A,"For numbers ending in 5: 3 × 4 = 12, append 25 → 1225."
+What is 45 × 45?,Vedic Math,Multiplication,2025,2005,2125,1925,A,"4 × 5 = 20, append 25 → 2025."
+What is 65 × 65?,Vedic Math,Multiplication,4225,4125,4325,4255,A,"6 × 7 = 42, append 25 → 4225."
+What is 75 × 75?,Vedic Math,Multiplication,5625,5525,5725,5650,A,"7 × 8 = 56, append 25 → 5625."
+What is 95 × 95?,Vedic Math,Multiplication,9025,9125,8925,9005,A,"9 × 10 = 90, append 25 → 9025."
+What is 99 × 98?,Vedic Math,Multiplication,9702,9802,9602,9720,A,"Using base 100: 99−2=97 and 1×2=02, giving 9702."
+What is 98 × 97?,Vedic Math,Multiplication,9506,9406,9606,9508,A,"Using base 100: 98−3=95 and 2×3=06, giving 9506."
+What is 97 × 96?,Vedic Math,Multiplication,9312,9212,9412,9306,A,"Using base 100: 97−4=93 and 3×4=12, giving 9312."
+What is 88 × 92?,Vedic Math,Multiplication,8096,8196,7996,8086,A,"Using base 100: 88−8=80 and 12×8=96, giving 8096."
+What is 103 × 104?,Vedic Math,Multiplication,10712,10612,10812,10702,A,"Using base 100: 103+4=107 and 3×4=12, giving 10712."
+What is 102 × 105?,Vedic Math,Multiplication,10710,10610,10810,10705,A,"Using base 100: 102+5=107 and 2×5=10, giving 10710."
+What is 999 + 876 using a quick Vedic subtraction approach?,Vedic Math,Addition,1875,1775,1885,1865,A,999 + 876 = 1875.
+What is 1000 − 467?,Vedic Math,Subtraction,533,543,523,537,A,Complement method: 1000 − 467 = 533.
+What is 10000 − 2789?,Vedic Math,Subtraction,7211,7111,7311,7291,A,Subtract 2789 from 10000 to get 7211.
+What is 11 × 23 using the Vedic Math method?,Vedic Math,Multiplication,253,243,263,233,A,"For ×11: 2, 2+3=5, 3 → 253."
+What is 11 × 45?,Vedic Math,Multiplication,495,485,505,490,A,"For ×11: 4, 4+5=9, 5 → 495."
+What is 11 × 72?,Vedic Math,Multiplication,792,782,802,772,A,"For ×11: 7, 7+2=9, 2 → 792."
+What is 15 × 15?,Vedic Math,Multiplication,225,215,235,250,A,"15 × 15 = 225; 1 × 2 = 2, append 25."
+What is 125 × 8?,Vedic Math,Multiplication,1000,900,1100,800,A,125 × 8 = 1000.

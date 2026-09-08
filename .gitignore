@@ -1,0 +1,23 @@
+﻿# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment variables
+.env
+.env.local
+*/.env
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+.expo/
+web-build/
+
+# Backups & unpacks
+existing_project/
+unpacked/
+
+# Logs
+*.log

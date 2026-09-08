@@ -1,0 +1,412 @@
+const bcrypt = require('bcryptjs');
+const Student = require('../models/Student');
+const Admin = require('../models/Admin');
+const OtpVerification = require('../models/OtpVerification');
+const { generateToken } = require('../utils/jwt');
+
+// POST /api/students/register
+exports.registerStudent = async (req, res, next) => {
+  try {
+    const { name, email, password, phone, courseName, trainerName } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(password);
+    if (!hasLetter || !hasNumber || !hasSpecial) {
+      return res.status(400).json({
+        message: 'Password must contain letters, numbers, and special characters (e.g. @$!%*?&#)'
+      });
+    }
+
+    const existingStudent = await Student.findOne({ email: email.toLowerCase() });
+    if (existingStudent) {
+      return res.status(400).json({ message: 'Student with this email already exists' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const student = await Student.create({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      phone,
+      courseName,
+      trainerName
+    });
+
+    const token = generateToken({ id: student._id, role: 'student', email: student.email });
+
+    res.status(201).json({
+      message: 'Student registered successfully',
+      token,
+      student: {
+        id: student._id,
+        name: student.name,
+        email: student.email,
+        phone: student.phone,
+        courseName: student.courseName,
+        trainerName: student.trainerName,
+        status: student.status
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/students/login
+exports.loginStudent = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    const student = await Student.findOne({ email: email.toLowerCase() });
+    if (!student) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    if (student.status === 'INACTIVE') {
+      return res.status(403).json({ message: 'Account is inactive. Please contact administrator.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, student.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    student.lastLogin = new Date();
+    await student.save();
+
+    const token = generateToken({ id: student._id, role: 'student', email: student.email });
+
+    res.json({
+      message: 'Login successful',
+      token,
+      student: {
+        id: student._id,
+        name: student.name,
+        email: student.email,
+        phone: student.phone,
+        courseName: student.courseName,
+        trainerName: student.trainerName,
+        status: student.status,
+        mockTestAllowed: student.mockTestAllowed
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/admin/login
+exports.loginAdmin = async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+
+    let admin = await Admin.findOne({ username });
+
+    // Seed default admin if none exists
+    if (!admin && username === 'admin') {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password || 'admin@123', salt);
+      admin = await Admin.create({ username: 'admin', password: hashedPassword });
+    }
+
+    if (!admin) {
+      return res.status(401).json({ message: 'Invalid admin credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid admin credentials' });
+    }
+
+    const token = generateToken({ id: admin._id, role: 'admin', username: admin.username });
+
+    res.json({
+      message: 'Admin login successful',
+      token,
+      admin: {
+        id: admin._id,
+        username: admin.username
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/students/forgot-password/request
+exports.requestForgotPassword = async (req, res, next) => {
+  try {
+    const { phone, email } = req.body;
+    const identifier = (phone || email || '').trim();
+
+    if (!identifier) {
+      return res.status(400).json({ message: 'Registered mobile number or email is required' });
+    }
+
+    const cleanDigits = identifier.replace(/[^0-9]/g, '');
+    const searchCriteria = [];
+
+    if (phone || (!identifier.includes('@') && cleanDigits.length >= 7)) {
+      const last10 = cleanDigits.slice(-10);
+      searchCriteria.push({ phone: identifier });
+      searchCriteria.push({ phone: cleanDigits });
+      searchCriteria.push({ phone: { $regex: last10 + '$' } });
+    }
+
+    if (email || identifier.includes('@')) {
+      searchCriteria.push({ email: identifier.toLowerCase() });
+    }
+
+    const student = await Student.findOne({ $or: searchCriteria });
+    if (!student) {
+      return res.status(404).json({
+        message: phone ? 'No registered student account found with this phone number' : 'Registered student account not found'
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    // Upsert verification record
+    const orQuery = [];
+    if (student.phone) orQuery.push({ phone: student.phone });
+    if (student.email) orQuery.push({ email: student.email });
+
+    await OtpVerification.findOneAndUpdate(
+      orQuery.length > 0 ? { $or: orQuery } : { email: student.email },
+      {
+        phone: student.phone || '',
+        email: student.email || '',
+        otp,
+        expiryTime,
+        verified: false
+      },
+      { upsert: true, new: true }
+    );
+
+    const maskedPhone = student.phone
+      ? `${student.phone.slice(0, 2)}******${student.phone.slice(-2)}`
+      : 'registered mobile';
+
+    res.json({
+      message: `OTP sent successfully to registered phone ${maskedPhone}`,
+      phone: student.phone,
+      email: student.email,
+      otp // for convenient dev & testing
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/students/forgot-password/verify-otp
+exports.verifyOtpOnly = async (req, res, next) => {
+  try {
+    const { phone, email, otp } = req.body;
+    const identifier = (phone || email || '').trim();
+
+    if (!identifier || !otp) {
+      return res.status(400).json({ message: 'Phone/Email and 6-digit OTP are required' });
+    }
+
+    const cleanDigits = identifier.replace(/[^0-9]/g, '');
+    const last10 = cleanDigits.slice(-10);
+
+    const orConditions = [];
+    if (cleanDigits.length >= 7) {
+      orConditions.push({ phone: identifier });
+      orConditions.push({ phone: cleanDigits });
+      orConditions.push({ phone: { $regex: last10 + '$' } });
+    }
+    if (identifier.includes('@') || email) {
+      orConditions.push({ email: identifier.toLowerCase() });
+    }
+
+    const record = await OtpVerification.findOne(
+      orConditions.length > 0 ? { $or: orConditions } : { email: identifier.toLowerCase() }
+    );
+
+    if (!record || record.otp !== otp.trim()) {
+      return res.status(400).json({ message: 'Invalid OTP code. Please enter the correct 6-digit OTP.' });
+    }
+
+    if (new Date() > record.expiryTime) {
+      return res.status(400).json({ message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    record.verified = true;
+    await record.save();
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully! Please enter your new password.'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/students/forgot-password/reset-password
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { phone, email, newPassword } = req.body;
+    const identifier = (phone || email || '').trim();
+
+    if (!identifier || !newPassword) {
+      return res.status(400).json({ message: 'Phone/Email and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    }
+
+    const hasLetter = /[a-zA-Z]/.test(newPassword);
+    const hasNumber = /\d/.test(newPassword);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(newPassword);
+    if (!hasLetter || !hasNumber || !hasSpecial) {
+      return res.status(400).json({
+        message: 'Password must contain letters, numbers, and special characters (e.g. @$!%*?&#)'
+      });
+    }
+
+    const cleanDigits = identifier.replace(/[^0-9]/g, '');
+    const last10 = cleanDigits.slice(-10);
+
+    const orConditions = [];
+    if (cleanDigits.length >= 7) {
+      orConditions.push({ phone: identifier });
+      orConditions.push({ phone: cleanDigits });
+      orConditions.push({ phone: { $regex: last10 + '$' } });
+    }
+    if (identifier.includes('@') || email) {
+      orConditions.push({ email: identifier.toLowerCase() });
+    }
+
+    const record = await OtpVerification.findOne({
+      ...(orConditions.length > 0 ? { $or: orConditions } : { email: identifier.toLowerCase() }),
+      verified: true
+    });
+
+    if (!record) {
+      return res.status(403).json({ message: 'Please verify the OTP before setting a new password' });
+    }
+
+    if (new Date() > record.expiryTime) {
+      return res.status(400).json({ message: 'Verification session expired. Please request OTP again.' });
+    }
+
+    const studentConditions = [];
+    if (record.phone) studentConditions.push({ phone: record.phone });
+    if (record.email) studentConditions.push({ email: record.email });
+
+    const student = await Student.findOne(
+      studentConditions.length > 0 ? { $or: studentConditions } : { email: record.email }
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student account not found' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    student.password = await bcrypt.hash(newPassword, salt);
+    await student.save();
+
+    await OtpVerification.deleteOne({ _id: record._id });
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully! You can now login with your new password.'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Legacy POST /api/students/forgot-password/verify (Backward compatibility)
+exports.verifyForgotPassword = async (req, res, next) => {
+  try {
+    const { email, phone, otp, newPassword } = req.body;
+    const identifier = (phone || email || '').trim();
+    if (!identifier || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Phone/Email, OTP, and new password are required' });
+    }
+
+    const cleanDigits = identifier.replace(/[^0-9]/g, '');
+    const last10 = cleanDigits.slice(-10);
+
+    const orConditions = [];
+    if (cleanDigits.length >= 7) {
+      orConditions.push({ phone: identifier });
+      orConditions.push({ phone: cleanDigits });
+      orConditions.push({ phone: { $regex: last10 + '$' } });
+    }
+    if (identifier.includes('@') || email) {
+      orConditions.push({ email: identifier.toLowerCase() });
+    }
+
+    const record = await OtpVerification.findOne(
+      orConditions.length > 0 ? { $or: orConditions } : { email: identifier.toLowerCase() }
+    );
+
+    if (!record || record.otp !== otp.trim()) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    if (new Date() > record.expiryTime) {
+      return res.status(400).json({ message: 'OTP has expired' });
+    }
+
+    const student = await Student.findOne({
+      $or: [
+        { phone: record.phone },
+        { email: record.email }
+      ]
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    student.password = await bcrypt.hash(newPassword, salt);
+    await student.save();
+
+    await OtpVerification.deleteOne({ _id: record._id });
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/students/profile
+exports.getStudentProfile = async (req, res, next) => {
+  try {
+    const student = await Student.findById(req.user.id).select('-password');
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    res.json(student);
+  } catch (error) {
+    next(error);
+  }
+};
