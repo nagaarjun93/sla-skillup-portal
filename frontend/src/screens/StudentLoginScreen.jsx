@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useUniversalRouter } from '../utils/useUniversalRouter';
@@ -50,7 +51,12 @@ export default function StudentLoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.headerBox}>
-          <Text style={styles.brandTitle}>SLA SkillUp / NMA</Text>
+          <Image
+            source={require('../../assets/sla_building.png')}
+            style={styles.logoImage}
+            resizeMode="cover"
+          />
+          <Text style={styles.brandTitle}>SLA SkillUp</Text>
           <Text style={styles.subTitle}>Student Aptitude Portal Login</Text>
         </View>
 
@@ -147,7 +153,20 @@ const styles = StyleSheet.create({
   },
   headerBox: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 24,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    marginBottom: 12,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 6 },
+      android: { elevation: 4 },
+      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+    }),
   },
   brandTitle: {
     fontSize: 26,
