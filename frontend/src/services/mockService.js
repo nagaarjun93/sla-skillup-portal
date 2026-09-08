@@ -44,6 +44,11 @@ export const mockService = {
     return response.data;
   },
 
+  getMockModels: async () => {
+    const response = await api.get('/admin/mock/models');
+    return response.data;
+  },
+
   getMockModelsStats: async () => {
     const response = await api.get('/admin/mock/models-stats');
     return response.data;

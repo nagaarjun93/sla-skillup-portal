@@ -16,6 +16,15 @@ const topicSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  type: {
+    type: String,
+    enum: ['aptitude', 'reasoning'],
+    default: 'aptitude'
+  },
+  icon: {
+    type: String,
+    default: '📚'
+  },
   createdAt: {
     type: Date,
     default: Date.now

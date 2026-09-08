@@ -69,6 +69,14 @@ const studentSchema = new mongoose.Schema({
   lastStreakClaimDate: {
     type: String,
     default: null
+  },
+  inventory: {
+    type: [String],
+    default: []
+  },
+  equippedFrame: {
+    type: String,
+    default: 'default'
   }
 }, { timestamps: true });
 

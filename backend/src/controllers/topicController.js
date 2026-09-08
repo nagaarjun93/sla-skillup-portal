@@ -3,34 +3,42 @@ const Question = require('../models/Question');
 const WeeklyTest = require('../models/WeeklyTest');
 
 const DEFAULT_TOPICS = [
-  { name: 'Vedic Math / Simplification', category: 'Vedic Math' },
-  { name: 'Ratio & Proportion / HCF & LCM', category: 'Ratio and Proportion' },
-  { name: 'Percentage', category: 'Percentage' },
-  { name: 'Time & Work / Pipes & Cistern', category: 'Time and Work' },
-  { name: 'Time, Speed & Distance', category: 'Speed and Distance' },
-  { name: 'Trains, Boats & Streams', category: 'Trains and Boats' },
-  { name: 'Profit & Loss', category: 'Profit and Loss' },
-  { name: 'Ages', category: 'Ages' },
-  { name: 'Simple Interest', category: 'Simple Interest' },
-  { name: 'Compound Interest', category: 'Compound Interest' },
-  { name: 'Permutation & Combination', category: 'Permutation' },
-  { name: 'Probability', category: 'Probability' },
-  { name: 'Alphabet Test / Letter Series', category: 'Alphabet Test' },
-  { name: 'Blood Relations', category: 'Blood Relation' },
-  { name: 'Coding & Decoding', category: 'Coding Decoding' },
-  { name: 'Syllogism', category: 'Syllogism' },
-  { name: 'Mathematical Operations (MOT)', category: 'MOT' },
-  { name: 'Seating Arrangement / Puzzles', category: 'Seating Arrangement' },
-  { name: 'Direction Test', category: 'Direction Test' }
+  { name: 'Vedic Math / Simplification', category: 'Vedic Math', type: 'aptitude', icon: '🧮' },
+  { name: 'Ratio & Proportion / HCF & LCM', category: 'Ratio and Proportion', type: 'aptitude', icon: '⚖️' },
+  { name: 'Percentage', category: 'Percentage', type: 'aptitude', icon: '📊' },
+  { name: 'Time & Work / Pipes & Cistern', category: 'Time and Work', type: 'aptitude', icon: '⏱️' },
+  { name: 'Time, Speed & Distance', category: 'Speed and Distance', type: 'aptitude', icon: '🚗' },
+  { name: 'Trains, Boats & Streams', category: 'Trains and Boats', type: 'aptitude', icon: '🚂' },
+  { name: 'Profit & Loss', category: 'Profit and Loss', type: 'aptitude', icon: '📈' },
+  { name: 'Ages', category: 'Ages', type: 'aptitude', icon: '👤' },
+  { name: 'Simple Interest', category: 'Simple Interest', type: 'aptitude', icon: '💰' },
+  { name: 'Compound Interest', category: 'Compound Interest', type: 'aptitude', icon: '🏦' },
+  { name: 'Permutation & Combination', category: 'Permutation', type: 'aptitude', icon: '🎲' },
+  { name: 'Probability', category: 'Probability', type: 'aptitude', icon: '🎯' },
+  { name: 'Alphabet Test / Letter Series', category: 'Alphabet Test', type: 'reasoning', icon: '🔤' },
+  { name: 'Blood Relations', category: 'Blood Relation', type: 'reasoning', icon: '👨‍👩‍👧‍👦' },
+  { name: 'Coding & Decoding', category: 'Coding Decoding', type: 'reasoning', icon: '🔐' },
+  { name: 'Syllogism', category: 'Syllogism', type: 'reasoning', icon: '🧠' },
+  { name: 'Mathematical Operations (MOT)', category: 'MOT', type: 'reasoning', icon: '➕' },
+  { name: 'Seating Arrangement / Puzzles', category: 'Seating Arrangement', type: 'reasoning', icon: '🪑' },
+  { name: 'Direction Test', category: 'Direction Test', type: 'reasoning', icon: '🧭' }
 ];
 
-// Seed default topics if collection is empty
+// Seed default topics if collection is empty or update missing type/icon
 const ensureDefaultTopics = async () => {
   try {
     const count = await Topic.countDocuments();
     if (count === 0) {
       await Topic.insertMany(DEFAULT_TOPICS);
       console.log('Seeded default topics into MongoDB');
+    } else {
+      // Backfill type and icon for existing topics if missing
+      for (const def of DEFAULT_TOPICS) {
+        await Topic.updateOne(
+          { name: def.name, $or: [{ type: { $exists: false } }, { icon: { $exists: false } }] },
+          { $set: { type: def.type, icon: def.icon } }
+        );
+      }
     }
 
     // Also auto-incorporate any topics found in Question or WeeklyTest collections
@@ -41,9 +49,12 @@ const ensureDefaultTopics = async () => {
     const allDiscovered = [...new Set([...qTopics, ...wTopics])].filter(Boolean);
     for (const top of allDiscovered) {
       if (!existingTopics.has(top.trim().toLowerCase())) {
+        const isReasoning = /reason|relation|puzzle|coding|syllogism|direction|series/i.test(top);
         await Topic.create({
           name: top.trim(),
-          category: top.trim()
+          category: top.trim(),
+          type: isReasoning ? 'reasoning' : 'aptitude',
+          icon: isReasoning ? '🧠' : '📚'
         });
         existingTopics.add(top.trim().toLowerCase());
       }

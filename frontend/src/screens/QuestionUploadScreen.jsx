@@ -70,6 +70,10 @@ export default function QuestionUploadScreen() {
   const [selectedWeeklyTestId, setSelectedWeeklyTestId] = useState('');
   const [selectedTopicLabel, setSelectedTopicLabel] = useState('Vedic Math / Simplification');
   const [selectedMockModel, setSelectedMockModel] = useState('Model 1');
+  const [mockModels, setMockModels] = useState([
+    'Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5',
+    'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'
+  ]);
   
   const [csvText, setCsvText] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('');
@@ -85,7 +89,19 @@ export default function QuestionUploadScreen() {
   useEffect(() => {
     fetchWeeklyTests();
     fetchTopics();
+    fetchMockModels();
   }, []);
+
+  const fetchMockModels = async () => {
+    try {
+      const models = await mockService.getMockModels();
+      if (Array.isArray(models) && models.length > 0) {
+        setMockModels(models);
+      }
+    } catch (e) {
+      console.warn('Failed to load mock models from DB:', e);
+    }
+  };
 
   const fetchTopics = async () => {
     try {
@@ -669,7 +685,7 @@ export default function QuestionUploadScreen() {
 
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
                         <View style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
-                          {['Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5', 'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'].map((m) => {
+                          {mockModels.map((m) => {
                             const isSelected = selectedMockModel === m;
                             return (
                               <TouchableOpacity

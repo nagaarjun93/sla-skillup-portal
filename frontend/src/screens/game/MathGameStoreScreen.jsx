@@ -13,6 +13,7 @@ import {
   loadGameEconomy,
   purchaseStoreItem,
   equipAvatarFrame,
+  fetchStoreCatalog,
 } from '../../game/services/gameStorage';
 
 // Catalog of store items tailored to the 3-month course
@@ -162,6 +163,7 @@ export default function MathGameStoreScreen({ navigation }) {
     boosterHints: 0,
     boosterTimeFreezes: 0,
   });
+  const [storeCatalog, setStoreCatalog] = useState(STORE_ITEMS);
   const [activeTab, setActiveTab] = useState('passes'); // 'passes' | 'frames' | 'boosters'
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -172,6 +174,17 @@ export default function MathGameStoreScreen({ navigation }) {
 
   useEffect(() => {
     fetchEconomy();
+    const loadCatalog = async () => {
+      try {
+        const items = await fetchStoreCatalog();
+        if (items && Array.isArray(items) && items.length > 0) {
+          setStoreCatalog(items);
+        }
+      } catch (err) {
+        console.warn('Error fetching dynamic store catalog:', err);
+      }
+    };
+    loadCatalog();
   }, [fetchEconomy]);
 
   const triggerVibrate = (pattern) => {
@@ -247,13 +260,21 @@ export default function MathGameStoreScreen({ navigation }) {
     }
   };
 
-  const filteredItems = STORE_ITEMS.filter((item) => item.category === activeTab);
+  const filteredItems = storeCatalog.filter((item) => item.category === activeTab);
+
+  const handleBack = () => {
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('math-game-home');
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
           <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🛍️ Rewards Store</Text>

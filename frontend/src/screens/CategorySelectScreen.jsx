@@ -14,55 +14,40 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import { examService } from '../services/examService';
 import { COLORS, SHADOWS } from '../styles/theme';
 
-const APTITUDE_TOPICS = [
-  { id: '1', name: 'Vedic Math / Simplification', category: 'Vedic Math', icon: '🧮' },
-  { id: '2', name: 'Ratio & Proportion / HCF & LCM', category: 'Ratio and Proportion', icon: '⚖️' },
-  { id: '3', name: 'Percentage', category: 'Percentage', icon: '📊' },
-  { id: '4', name: 'Time & Work / Pipes & Cistern', category: 'Time and Work', icon: '⏱️' },
-  { id: '5', name: 'Time, Speed & Distance', category: 'Speed and Distance', icon: '🚗' },
-  { id: '6', name: 'Trains, Boats & Streams', category: 'Trains and Boats', icon: '🚂' },
-  { id: '7', name: 'Profit & Loss', category: 'Profit and Loss', icon: '📈' },
-  { id: '8', name: 'Ages', category: 'Ages', icon: '👤' },
-  { id: '9', name: 'Simple Interest', category: 'Simple Interest', icon: '💰' },
-  { id: '10', name: 'Compound Interest', category: 'Compound Interest', icon: '🏦' },
-  { id: '11', name: 'Permutation & Combination', category: 'Permutation', icon: '🎲' },
-  { id: '12', name: 'Probability', category: 'Probability', icon: '🎯' },
-];
-
-const REASONING_TOPICS = [
-  { id: '13', name: 'Alphabet Test / Letter Series', category: 'Alphabet Test', icon: '🔤' },
-  { id: '14', name: 'Blood Relations', category: 'Blood Relation', icon: '👨‍👩‍👧‍👦' },
-  { id: '15', name: 'Coding & Decoding', category: 'Coding Decoding', icon: '🔐' },
-  { id: '16', name: 'Syllogism', category: 'Syllogism', icon: '🧠' },
-  { id: '17', name: 'Mathematical Operations (MOT)', category: 'MOT', icon: '➕' },
-  { id: '18', name: 'Seating Arrangement / Puzzles', category: 'Seating Arrangement', icon: '🪑' },
-  { id: '19', name: 'Direction Test', category: 'Direction Test', icon: '🧭' },
-];
-
 export default function CategorySelectScreen() {
   const router = useUniversalRouter();
+  const [topics, setTopics] = useState([]);
   const [dbCategories, setDbCategories] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCategoryDetails();
+    fetchData();
   }, []);
 
-  const fetchCategoryDetails = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await examService.getCategoryDetails();
+      const [topicsData, catDetails] = await Promise.all([
+        examService.getTopics(),
+        examService.getCategoryDetails(),
+      ]);
+
+      setTopics(topicsData || []);
+
       const catMap = {};
-      (data || []).forEach(item => {
+      (catDetails || []).forEach(item => {
         catMap[item.category] = item;
       });
       setDbCategories(catMap);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Error fetching categories and topics:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const aptitudeTopics = topics.filter(t => (t.type || 'aptitude') === 'aptitude');
+  const reasoningTopics = topics.filter(t => t.type === 'reasoning');
 
   // Open Paper & Pen Practice View for selected topic
   const handleOpenPaperPractice = (topicObj) => {
@@ -76,7 +61,7 @@ export default function CategorySelectScreen() {
     });
   };
 
-  // Start Timed Practice Exam for selected topic
+  // Start Timed Practice Exam for selected topic (Dynamic duration from DB)
   const handleStartTimedExam = (topicObj) => {
     const categoryName = topicObj.category || topicObj.name;
     const dbInfo = dbCategories[categoryName];
@@ -91,29 +76,35 @@ export default function CategorySelectScreen() {
   };
 
   const renderTopicCard = (item) => {
-    const dbInfo = dbCategories[item.category];
+    const categoryName = item.category || item.name;
+    const dbInfo = dbCategories[categoryName];
     const qCount = dbInfo ? dbInfo.totalQuestions : 0;
     const duration = dbInfo ? dbInfo.durationMinutes : 30;
 
     return (
-      <View key={item.id} style={styles.categoryCard}>
+      <View key={item._id || item.id || item.name} style={styles.categoryCard}>
         <View style={styles.cardHeader}>
-          <View style={styles.iconTitleRow}>
-            <Text style={styles.topicIcon}>{item.icon}</Text>
-            <Text style={styles.categoryTitle}>{item.name}</Text>
-          </View>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>📝 {qCount} Qs</Text>
+          <Text style={styles.topicIcon}>{item.icon || '📚'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>{item.name}</Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.qCountBadge}>
+                {qCount} Questions in DB
+              </Text>
+              <Text style={styles.durationBadge}>
+                ⏱ {duration} Mins
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.actionRow}>
+        <View style={styles.actionsRow}>
           <TouchableOpacity
             style={styles.paperPracticeBtn}
             onPress={() => handleOpenPaperPractice(item)}
             activeOpacity={0.8}
           >
-            <Text style={styles.paperPracticeText}>📄 View Practice Questions (Paper & Pen)</Text>
+            <Text style={styles.paperBtnText}>📝 Practice (Q&A)</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -121,7 +112,7 @@ export default function CategorySelectScreen() {
             onPress={() => handleStartTimedExam(item)}
             activeOpacity={0.8}
           >
-            <Text style={styles.timedExamText}>⏱️ Timed Test ({duration}m)</Text>
+            <Text style={styles.timedBtnText}>⏱ Take Exam</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -129,9 +120,9 @@ export default function CategorySelectScreen() {
   };
 
   return (
-    <ProtectedRoute roleRequired="student">
+    <ProtectedRoute>
       <View style={styles.container}>
-        <Navbar title="Aptitude & Reasoning Practice Topics" />
+        <Navbar title="Practice by Topic" />
 
         <ScrollView
           style={{ flex: 1 }}
@@ -151,18 +142,18 @@ export default function CategorySelectScreen() {
             <>
               {/* Aptitude Topics Section */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>🔢 Aptitude Topics ({APTITUDE_TOPICS.length})</Text>
+                <Text style={styles.sectionTitle}>🔢 Aptitude Topics ({aptitudeTopics.length})</Text>
               </View>
               <View style={styles.topicGrid}>
-                {APTITUDE_TOPICS.map(renderTopicCard)}
+                {aptitudeTopics.map(renderTopicCard)}
               </View>
 
               {/* Reasoning Topics Section */}
               <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-                <Text style={styles.sectionTitle}>🧠 Reasoning Topics ({REASONING_TOPICS.length})</Text>
+                <Text style={styles.sectionTitle}>🧠 Reasoning Topics ({reasoningTopics.length})</Text>
               </View>
               <View style={styles.topicGrid}>
-                {REASONING_TOPICS.map(renderTopicCard)}
+                {reasoningTopics.map(renderTopicCard)}
               </View>
             </>
           )}
@@ -220,37 +211,42 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  iconTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    gap: 12,
   },
   topicIcon: {
-    fontSize: 22,
+    fontSize: 26,
   },
-  categoryTitle: {
+  cardTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.text,
-    flex: 1,
+    marginBottom: 4,
   },
-  badge: {
-    backgroundColor: COLORS.gray100,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+  metaRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  badgeText: {
-    fontSize: 12,
+  qCountBadge: {
+    fontSize: 11,
     color: COLORS.primary,
     fontWeight: '700',
+    backgroundColor: COLORS.selectedBg,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  actionRow: {
+  durationBadge: {
+    fontSize: 11,
+    color: COLORS.gray600,
+    fontWeight: '600',
+    backgroundColor: COLORS.gray100,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  actionsRow: {
     flexDirection: Platform.OS === 'web' ? 'row' : 'column',
     gap: 10,
   },
@@ -264,7 +260,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: 'center',
   },
-  paperPracticeText: {
+  paperBtnText: {
     color: COLORS.primary,
     fontSize: 13,
     fontWeight: '700',
@@ -276,7 +272,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: 'center',
   },
-  timedExamText: {
+  timedBtnText: {
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '700',

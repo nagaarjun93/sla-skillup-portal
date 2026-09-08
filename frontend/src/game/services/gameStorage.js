@@ -120,9 +120,15 @@ export async function loadGameEconomy() {
     try {
       const { data } = await api.get('/student/game/status');
       if (data) {
-        economy.coins = data.coins;
-        economy.dailyStreak = data.dailyStreak;
+        economy.coins = data.coins !== undefined ? data.coins : economy.coins;
+        economy.dailyStreak = data.dailyStreak !== undefined ? data.dailyStreak : economy.dailyStreak;
         economy.lastStreakDate = data.lastStreakDate;
+        if (Array.isArray(data.inventory)) {
+          economy.inventory = data.inventory;
+        }
+        if (data.equippedFrame) {
+          economy.equippedFrame = data.equippedFrame;
+        }
         await AsyncStorage.setItem(STORAGE_KEYS.ECONOMY, JSON.stringify(economy));
 
         return {
@@ -319,7 +325,22 @@ export async function recordDailySpin(prizeCoins) {
 }
 
 /**
- * Purchase item from Rewards Store
+ * Fetch dynamic store items catalog from backend
+ */
+export async function fetchStoreCatalog() {
+  try {
+    const { data } = await api.get('/student/game/store-items');
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch (err) {
+    console.warn('Could not fetch store catalog from backend:', err);
+  }
+  return null;
+}
+
+/**
+ * Purchase item from Rewards Store (Synced to MongoDB Atlas)
  */
 export async function purchaseStoreItem(item) {
   try {
@@ -336,8 +357,26 @@ export async function purchaseStoreItem(item) {
       return { success: false, reason: 'already_owned' };
     }
 
-    const newCoins = economy.coins - cost;
-    const newInventory = type !== 'booster' ? [...currentInventory, id] : currentInventory;
+    let newCoins = economy.coins - cost;
+    let newInventory = type !== 'booster' ? [...currentInventory, id] : currentInventory;
+
+    // Sync to MongoDB Cloud!
+    try {
+      const { data } = await api.post('/student/game/purchase', {
+        itemId: id,
+        cost,
+        type,
+      });
+      if (data && data.success) {
+        newCoins = data.coins !== undefined ? data.coins : newCoins;
+        newInventory = Array.isArray(data.inventory) ? data.inventory : newInventory;
+      }
+    } catch (apiErr) {
+      console.warn('Backend store purchase sync error:', apiErr);
+      if (apiErr.response?.data?.message === 'Insufficient coins') {
+        return { success: false, reason: 'insufficient_coins' };
+      }
+    }
 
     let boosterHints = economy.boosterHints || 0;
     let boosterTimeFreezes = economy.boosterTimeFreezes || 0;
@@ -372,11 +411,19 @@ export async function purchaseStoreItem(item) {
 }
 
 /**
- * Equip Avatar Frame
+ * Equip Avatar Frame (Synced to MongoDB Atlas)
  */
 export async function equipAvatarFrame(frameId) {
   try {
     const economy = await loadGameEconomy();
+    
+    // Sync to backend MongoDB!
+    try {
+      await api.post('/student/game/equip-frame', { frameId });
+    } catch (apiErr) {
+      console.warn('Backend equip frame sync error:', apiErr);
+    }
+
     const updated = { ...economy, equippedFrame: frameId };
     await AsyncStorage.setItem(STORAGE_KEYS.ECONOMY, JSON.stringify(updated));
     return { success: true, equippedFrame: frameId };

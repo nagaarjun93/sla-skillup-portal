@@ -20,8 +20,10 @@ router.post('/admin/mock/auto-distribute-models', protect, adminOnly, mockTestCo
 router.post('/admin/students/mock-access', protect, adminOnly, mockTestController.setBulkMockAccess);
 router.put('/admin/students/mock-access', protect, adminOnly, mockTestController.setBulkMockAccess);
 router.get('/admin/mock/access', protect, adminOnly, mockTestController.getMockAccessList);
+router.get('/admin/mock/models', protect, adminOnly, mockTestController.getMockModels);
 router.get('/admin/mock/results', protect, adminOnly, mockTestController.getMockResultsAdmin);
 router.get('/admin/mock/results/:id/details', protect, adminOnly, mockTestController.getMockResultDetails);
+
 
 // Student Mock Routes
 router.get('/student/mock/access', protect, studentOnly, mockTestController.checkStudentMockAccess);

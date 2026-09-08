@@ -135,6 +135,21 @@ export default function StudentProfileScreen() {
             </View>
           </View>
 
+          <View style={[styles.metricsRow, { marginTop: -6 }]}>
+            <View style={styles.metricBox}>
+              <Text style={[styles.metricVal, { color: '#f59e0b' }]}>
+                🔥 {activeStudent?.dailyStreak || 1} Days
+              </Text>
+              <Text style={styles.metricLabel}>Daily Streak</Text>
+            </View>
+            <View style={styles.metricBox}>
+              <Text style={[styles.metricVal, { color: '#10b981' }]}>
+                🪙 {(activeStudent?.gameCoins ?? 200).toLocaleString()}
+              </Text>
+              <Text style={styles.metricLabel}>Game Coins</Text>
+            </View>
+          </View>
+
           {/* Account Details Section */}
           <Text style={styles.sectionTitle}>Academic & Contact Info</Text>
           <View style={styles.infoCard}>

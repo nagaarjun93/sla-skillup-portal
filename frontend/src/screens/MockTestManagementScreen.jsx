@@ -24,6 +24,7 @@ const MODEL_SETS = [
 ];
 
 export default function MockTestManagementScreen() {
+  const [modelSets, setModelSets] = useState(MODEL_SETS);
   const [passingMarks, setPassingMarks] = useState('35');
   const [durationMinutes, setDurationMinutes] = useState('45');
   
@@ -96,6 +97,15 @@ export default function MockTestManagementScreen() {
 
       const stats = await mockService.getMockModelsStats();
       setModelStats(stats || []);
+
+      try {
+        const modelsRes = await mockService.getMockModels();
+        if (Array.isArray(modelsRes) && modelsRes.length > 0) {
+          setModelSets(modelsRes);
+        }
+      } catch (err) {
+        console.warn('Could not fetch dynamic models:', err);
+      }
 
       const stList = await adminService.getAllStudents();
       setStudents(stList || []);
@@ -424,7 +434,7 @@ export default function MockTestManagementScreen() {
             </Text>
 
             <View style={styles.modelsGrid}>
-              {MODEL_SETS.map(m => {
+              {modelSets.map(m => {
                 const stat = modelStats.find(s => s.modelSet === m) || { questionCount: 0, studentCount: 0 };
                 const isSelected = selectedUploadModel === m;
                 const hasQuestions = stat.questionCount > 0;
@@ -530,7 +540,7 @@ export default function MockTestManagementScreen() {
                           <Text style={styles.assignedLabel}>Assigned Mock Paper:</Text>
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
                             <View style={styles.modelChipsRow}>
-                              {MODEL_SETS.map((m) => {
+                              {modelSets.map((m) => {
                                 const active = currentModel === m;
                                 return (
                                   <TouchableOpacity
@@ -597,7 +607,7 @@ export default function MockTestManagementScreen() {
                   >
                     <Text style={[styles.filterChipText, selectedFilterModel === 'All' && styles.activeFilterChipText]}>All</Text>
                   </TouchableOpacity>
-                  {MODEL_SETS.map(m => (
+                  {modelSets.map(m => (
                     <TouchableOpacity
                       key={m}
                       style={[styles.filterChip, selectedFilterModel === m && styles.activeFilterChip]}

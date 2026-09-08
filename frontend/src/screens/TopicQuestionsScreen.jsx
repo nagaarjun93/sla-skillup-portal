@@ -20,11 +20,25 @@ export default function TopicQuestionsScreen() {
 
   const [questions, setQuestions] = useState([]);
   const [showSolutionMap, setShowSolutionMap] = useState({});
+  const [dbDuration, setDbDuration] = useState(30);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchQuestions();
+    fetchDuration();
   }, []);
+
+  const fetchDuration = async () => {
+    try {
+      const details = await examService.getCategoryDetails();
+      const match = (details || []).find(d => d.category === category || d.category === title);
+      if (match && match.durationMinutes) {
+        setDbDuration(match.durationMinutes);
+      }
+    } catch (e) {
+      console.warn('Could not load category duration:', e);
+    }
+  };
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -51,7 +65,7 @@ export default function TopicQuestionsScreen() {
       params: {
         category,
         title: title || category,
-        duration: 30,
+        duration: dbDuration,
       },
     });
   };

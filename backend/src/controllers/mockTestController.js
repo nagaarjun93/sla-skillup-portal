@@ -8,6 +8,22 @@ const fs = require('fs');
 
 // --- Admin Mock Operations ---
 
+// GET /api/admin/mock/models
+exports.getMockModels = async (req, res, next) => {
+  try {
+    const existingModels = await MockQuestion.distinct('modelSet');
+    const studentAssigned = await Student.distinct('assignedMockModel');
+    const defaultModels = [
+      'Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5',
+      'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'
+    ];
+    const allModels = [...new Set([...defaultModels, ...existingModels, ...studentAssigned])].filter(Boolean);
+    res.json(allModels);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // POST /api/admin/mock/questions/save-bulk
 exports.saveBulkMockQuestions = async (req, res, next) => {
   try {

@@ -20,6 +20,9 @@ router.get('/student/game/status', protect, gameController.getGameStatus);
 router.post('/student/game/spin', protect, gameController.recordSpin);
 router.post('/student/game/claim-streak', protect, gameController.claimStreakBonus);
 router.post('/student/game/award-coins', protect, gameController.awardCoins);
+router.get('/student/game/store-items', protect, gameController.getStoreItems);
+router.post('/student/game/purchase', protect, gameController.purchaseItem);
+router.post('/student/game/equip-frame', protect, gameController.equipFrame);
 
 module.exports = router;
 
