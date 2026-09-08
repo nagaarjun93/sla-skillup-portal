@@ -93,10 +93,18 @@ export function useUniversalRouter() {
         navigation.navigate(routeName, params);
       }
     },
-    back: () => {
+    back: (fallbackRoute) => {
       if (navigation && navigation.canGoBack()) {
         navigation.goBack();
+      } else if (navigation) {
+        // Safe intelligent fallback so pressing back NEVER freezes or fails
+        const target = fallbackRoute || 'home';
+        const { routeName, params } = parseRoute(target);
+        navigation.navigate(routeName || 'home', params);
       }
+    },
+    canGoBack: () => {
+      return navigation ? navigation.canGoBack() : false;
     },
     params: routeParams,
   };

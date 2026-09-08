@@ -14,6 +14,7 @@ import ScoreSummary from '../components/ScoreSummary';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { adminService } from '../services/adminService';
 import { mockService } from '../services/mockService';
+import api from '../services/api';
 import { COLORS, SHADOWS } from '../styles/theme';
 
 export default function ViewMistakesScreen({ route }) {
@@ -24,6 +25,7 @@ export default function ViewMistakesScreen({ route }) {
 
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [countdownStr, setCountdownStr] = useState('');
 
   useEffect(() => {
     if (activeId) {
@@ -33,6 +35,28 @@ export default function ViewMistakesScreen({ route }) {
     }
   }, [activeId, isMockResult]);
 
+  useEffect(() => {
+    if (!details || details.canViewMistakes !== false) return;
+
+    let remaining = details.msUntilReviewUnlock || 0;
+    const update = () => {
+      if (remaining <= 0) {
+        setCountdownStr('Review is ready! Refresh to view answers.');
+        return;
+      }
+      const h = Math.floor(remaining / 3600000);
+      const m = Math.floor((remaining % 3600000) / 60000);
+      const s = Math.floor((remaining % 60000) / 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      setCountdownStr(`${pad(h)}h ${pad(m)}m ${pad(s)}s`);
+      remaining = Math.max(0, remaining - 1000);
+    };
+
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [details]);
+
   const fetchResultDetails = async (targetId) => {
     const fetchId = targetId || activeId;
     if (!fetchId) return;
@@ -41,9 +65,19 @@ export default function ViewMistakesScreen({ route }) {
     try {
       let data;
       if (isMockResult) {
-        data = await mockService.getMockResultDetails(fetchId);
+        try {
+          const res = await api.get(`/student/mock/results/${fetchId}/details`);
+          data = res.data;
+        } catch (err) {
+          data = await mockService.getMockResultDetails(fetchId);
+        }
       } else {
-        data = await adminService.getResultDetails(fetchId);
+        try {
+          const res = await api.get(`/results/${fetchId}/details`);
+          data = res.data;
+        } catch (err) {
+          data = await adminService.getResultDetails(fetchId);
+        }
       }
       setDetails(data);
     } catch (e) {
@@ -68,7 +102,7 @@ export default function ViewMistakesScreen({ route }) {
   const submittedAnswers = details?.submittedAnswers || {};
 
   return (
-    <ProtectedRoute roleRequired="admin">
+    <ProtectedRoute>
       <View style={styles.container}>
         <Navbar title={isMockResult ? "Mock Test Result Breakdown" : "Student Result Breakdown"} />
 
@@ -99,6 +133,35 @@ export default function ViewMistakesScreen({ route }) {
                 onPress={() => router.back()}
               >
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>← Back to Results</Text>
+              </TouchableOpacity>
+            </View>
+          ) : details?.canViewMistakes === false ? (
+            <View style={styles.lockCard}>
+              <Text style={styles.lockIcon}>🔒</Text>
+              <Text style={styles.lockTitle}>Answers & Mistakes Locked</Text>
+              <Text style={styles.lockDesc}>
+                To maintain exam integrity and prevent question leakage, detailed question breakdowns and correct answers unlock 24 hours after test submission.
+              </Text>
+
+              <View style={styles.countdownBox}>
+                <Text style={styles.countdownLabel}>⏳ Review Unlocks In:</Text>
+                <Text style={styles.countdownValue}>{countdownStr || 'Calculating...'}</Text>
+              </View>
+
+              <View style={styles.recordedScoreBox}>
+                <Text style={styles.recordedScoreTitle}>Recorded Test Score</Text>
+                <Text style={styles.recordedScoreNumber}>{result.score} / {result.total}</Text>
+                <Text style={styles.recordedScoreSub}>
+                  Correct: {result.correctAnswers || 0} | Incorrect: {result.wrongAnswers || 0}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.backButtonLarge}
+                onPress={() => router.back('home')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.backButtonText}>← Return to Home Screen</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -417,6 +480,105 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.gray600,
     fontSize: 14,
+  },
+  lockCard: {
+    backgroundColor: COLORS.white,
+    padding: 24,
+    borderRadius: 16,
+    marginTop: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  lockIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  lockTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  lockDesc: {
+    fontSize: 13,
+    color: COLORS.gray600,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  countdownBox: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
+  },
+  countdownLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  countdownValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#1e40af',
+    letterSpacing: 1,
+  },
+  recordedScoreBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 16,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  recordedScoreTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.gray600,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  recordedScoreNumber: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.primary,
+    marginBottom: 4,
+  },
+  recordedScoreSub: {
+    fontSize: 12,
+    color: COLORS.gray600,
+    fontWeight: '500',
+  },
+  backButtonLarge: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   }
 });
 

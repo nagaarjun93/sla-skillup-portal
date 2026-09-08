@@ -5,7 +5,7 @@ import { useArjunAuth } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import NavIcon from './NavIcon';
 
-export default function Navbar({ title = 'SLA SkillUp', showBack = true, showLogout = true }) {
+export default function Navbar({ title = 'SLA SkillUp', showBack = true, showLogout = true, onBack }) {
   const router = useUniversalRouter();
   const { user, role, logout } = useArjunAuth();
 
@@ -21,11 +21,24 @@ export default function Navbar({ title = 'SLA SkillUp', showBack = true, showLog
 
   const isProfilePage = title && title.toLowerCase().includes('profile');
 
+  const handleBackPress = () => {
+    if (typeof onBack === 'function') {
+      onBack();
+    } else {
+      router.back(role === 'admin' ? 'admin-dashboard' : 'home');
+    }
+  };
+
   return (
     <View style={styles.headerContainer}>
       <View style={styles.leftSection}>
         {showBack && (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={styles.backBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
+          >
             <Text style={styles.backText}>‹</Text>
           </TouchableOpacity>
         )}

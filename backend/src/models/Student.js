@@ -49,6 +49,26 @@ const studentSchema = new mongoose.Schema({
     type: String,
     default: 'Model 1',
     trim: true
+  },
+  dailyStreak: {
+    type: Number,
+    default: 1
+  },
+  lastActiveDate: {
+    type: String,
+    default: null
+  },
+  gameCoins: {
+    type: Number,
+    default: 200
+  },
+  lastSpinTimestamp: {
+    type: Number,
+    default: 0
+  },
+  lastStreakClaimDate: {
+    type: String,
+    default: null
   }
 }, { timestamps: true });
 

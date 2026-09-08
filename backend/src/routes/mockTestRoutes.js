@@ -28,6 +28,7 @@ router.get('/student/mock/access', protect, studentOnly, mockTestController.chec
 router.get('/student/mock/check-attempted', protect, studentOnly, mockTestController.checkStudentAttempted);
 router.get('/student/mock/exam', protect, studentOnly, mockTestController.getStudentMockExam);
 router.post('/student/mock/submit', protect, studentOnly, mockTestController.submitStudentMockExam);
+router.get('/student/mock/results/:id/details', protect, mockTestController.getMockResultDetails);
 router.get('/admin/mock/results', protect, adminOnly, mockTestController.getMockResultsAdmin);
 router.get('/student/mock/result', protect, adminOnly, mockTestController.getMockResultsAdmin);
 

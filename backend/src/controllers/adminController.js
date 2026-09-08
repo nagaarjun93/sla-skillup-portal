@@ -326,7 +326,34 @@ exports.getResultDetails = async (req, res, next) => {
       return res.status(404).json({ message: 'Result not found' });
     }
 
-    let parsedAnswers = {};
+    // ── 24-Hour Review Lock Rule ──────────────────────────────────
+    const now = Date.now();
+    const submissionTime = new Date(result.submittedAt).getTime();
+    const msSinceSubmission = now - submissionTime;
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+    const isStudent = req.user && req.user.role === 'student';
+    const canViewMistakes = !isStudent || (msSinceSubmission >= TWENTY_FOUR_HOURS_MS);
+    const msUntilReviewUnlock = Math.max(0, TWENTY_FOUR_HOURS_MS - msSinceSubmission);
+
+    if (!canViewMistakes) {
+      return res.json({
+        result: {
+          _id: result._id,
+          score: result.score,
+          total: result.total,
+          category: result.category,
+          submittedAt: result.submittedAt,
+          correctAnswers: result.correctAnswers,
+          wrongAnswers: result.wrongAnswers,
+          weeklyTestId: result.weeklyTestId,
+          isPassed: result.isPassed
+        },
+        canViewMistakes: false,
+        msUntilReviewUnlock,
+        unlockAt: new Date(submissionTime + TWENTY_FOUR_HOURS_MS).toISOString(),
+        message: 'Detailed answer explanations and mistakes will unlock 24 hours after submission to maintain exam integrity.'
+      });
+    }
     if (result.answersJson) {
       try {
         parsedAnswers = JSON.parse(result.answersJson);
@@ -370,7 +397,8 @@ exports.getResultDetails = async (req, res, next) => {
     res.json({
       result,
       submittedAnswers: parsedAnswers,
-      questions
+      questions,
+      canViewMistakes: true
     });
   } catch (error) {
     next(error);

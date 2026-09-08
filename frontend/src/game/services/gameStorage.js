@@ -4,6 +4,7 @@
  * virtual coin economy, daily streak bonuses, lucky spin, and store inventory.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../services/api';
 
 const STORAGE_KEYS = {
   LEVELS_PROGRESS: '@math_game_levels_progress_v1',
@@ -113,11 +114,30 @@ export async function loadGameEconomy() {
     let economy = DEFAULT_ECONOMY;
     if (raw) {
       economy = { ...DEFAULT_ECONOMY, ...JSON.parse(raw) };
-    } else {
-      await AsyncStorage.setItem(STORAGE_KEYS.ECONOMY, JSON.stringify(DEFAULT_ECONOMY));
     }
 
-    // Evaluate daily streak availability
+    // Try fetching live cloud state from MongoDB!
+    try {
+      const { data } = await api.get('/student/game/status');
+      if (data) {
+        economy.coins = data.coins;
+        economy.dailyStreak = data.dailyStreak;
+        economy.lastStreakDate = data.lastStreakDate;
+        await AsyncStorage.setItem(STORAGE_KEYS.ECONOMY, JSON.stringify(economy));
+
+        return {
+          ...economy,
+          dailyStreak: data.dailyStreak,
+          canClaimStreak: data.canClaimStreak,
+          canSpin: data.canSpin,
+          msUntilNextSpin: data.msUntilNextSpin,
+        };
+      }
+    } catch (apiErr) {
+      // Offline fallback: calculate locally
+    }
+
+    // Fallback local calculations
     const todayStr = new Date().toISOString().split('T')[0];
     let canClaimStreak = false;
     let currentStreak = economy.dailyStreak || 0;
@@ -125,7 +145,6 @@ export async function loadGameEconomy() {
     if (!economy.lastStreakDate) {
       canClaimStreak = true;
     } else if (economy.lastStreakDate !== todayStr) {
-      // Check if consecutive (yesterday or broken)
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
@@ -133,13 +152,11 @@ export async function loadGameEconomy() {
       if (economy.lastStreakDate === yesterdayStr) {
         canClaimStreak = true;
       } else {
-        // Streak broken, reset to 0 upon next claim
         canClaimStreak = true;
         currentStreak = 0;
       }
     }
 
-    // Evaluate Lucky Spin availability (24 hours cooldown)
     const now = Date.now();
     const COOLDOWN_MS = 24 * 60 * 60 * 1000;
     const timeSinceSpin = now - (economy.lastSpinTimestamp || 0);
@@ -217,8 +234,22 @@ export async function claimDailyStreakBonus() {
     }
 
     const reward = STREAK_REWARDS[nextStreak - 1] || { coins: 50 };
-    const coinsWon = reward.coins;
-    const newCoins = (economy.coins || 0) + coinsWon;
+    let coinsWon = reward.coins;
+    let newCoins = (economy.coins || 0) + coinsWon;
+
+    // Sync to backend MongoDB Atlas!
+    try {
+      const { data } = await api.post('/student/game/claim-streak');
+      if (data && data.success) {
+        coinsWon = data.coinsWon;
+        nextStreak = data.streakDay;
+        newCoins = data.totalCoins;
+      }
+    } catch (apiErr) {
+      if (apiErr.response?.data?.message) {
+        return { success: false, message: apiErr.response.data.message };
+      }
+    }
 
     const updated = {
       ...economy,
@@ -247,7 +278,18 @@ export async function claimDailyStreakBonus() {
 export async function recordDailySpin(prizeCoins) {
   try {
     const economy = await loadGameEconomy();
-    const newCoins = (economy.coins || 0) + prizeCoins;
+    let newCoins = (economy.coins || 0) + prizeCoins;
+
+    // Sync spin to backend MongoDB Atlas!
+    try {
+      const { data } = await api.post('/student/game/spin', { prizeCoins });
+      if (data && data.totalCoins !== undefined) {
+        newCoins = data.totalCoins;
+      }
+    } catch (apiErr) {
+      // Offline fallback: keep local computation
+    }
+
     const updated = {
       ...economy,
       coins: newCoins,

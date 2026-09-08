@@ -63,6 +63,26 @@ exports.registerStudent = async (req, res, next) => {
   }
 };
 
+function updateDailyStreak(student) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (!student.lastActiveDate) {
+    student.dailyStreak = 1;
+    student.lastActiveDate = todayStr;
+  } else if (student.lastActiveDate !== todayStr) {
+    const lastDate = new Date(student.lastActiveDate);
+    const today = new Date(todayStr);
+    const diffTime = Math.abs(today - lastDate);
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      student.dailyStreak = (student.dailyStreak || 0) + 1;
+    } else if (diffDays > 1) {
+      student.dailyStreak = 1;
+    }
+    student.lastActiveDate = todayStr;
+  }
+}
+
 // POST /api/students/login
 exports.loginStudent = async (req, res, next) => {
   try {
@@ -87,6 +107,7 @@ exports.loginStudent = async (req, res, next) => {
     }
 
     student.lastLogin = new Date();
+    updateDailyStreak(student);
     await student.save();
 
     const token = generateToken({ id: student._id, role: 'student', email: student.email });
@@ -102,7 +123,10 @@ exports.loginStudent = async (req, res, next) => {
         courseName: student.courseName,
         trainerName: student.trainerName,
         status: student.status,
-        mockTestAllowed: student.mockTestAllowed
+        mockTestAllowed: student.mockTestAllowed,
+        dailyStreak: student.dailyStreak || 1,
+        gameCoins: student.gameCoins ?? 200,
+        lastActiveDate: student.lastActiveDate
       }
     });
   } catch (error) {
@@ -405,6 +429,8 @@ exports.getStudentProfile = async (req, res, next) => {
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
+    updateDailyStreak(student);
+    await student.save();
     res.json(student);
   } catch (error) {
     next(error);

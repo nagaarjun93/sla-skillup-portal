@@ -2,17 +2,20 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { useUniversalRouter } from '../utils/useUniversalRouter';
 import Navbar from '../components/Navbar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { weeklyService } from '../services/weeklyService';
 import { COLORS, SHADOWS } from '../styles/theme';
 
 export default function PreviousTestsScreen() {
+  const router = useUniversalRouter();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,22 +35,71 @@ export default function PreviousTestsScreen() {
     }
   };
 
-  const renderHistoryItem = (item) => (
-    <View key={item._id} style={styles.card}>
-      <View style={styles.topRow}>
-        <Text style={styles.title}>{item.weeklyTestId?.title || item.weeklyTestId?.weekName || `${item.category || 'Aptitude'} Practice Test`}</Text>
-        <Text style={styles.dateText}>{new Date(item.submittedAt).toLocaleDateString()}</Text>
-      </View>
+  const renderHistoryItem = (item) => {
+    const submittedTime = item.submittedAt ? new Date(item.submittedAt).getTime() : 0;
+    const msPassed = Date.now() - submittedTime;
+    const unlockMs = 24 * 60 * 60 * 1000;
+    const isLocked = msPassed < unlockMs;
+    const msRemaining = Math.max(0, unlockMs - msPassed);
+    const hoursRemaining = Math.floor(msRemaining / (1000 * 60 * 60));
+    const minutesRemaining = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
 
-      <Text style={styles.subText}>Category / Topic: {item.category || item.weeklyTestId?.topic || 'General'}</Text>
+    return (
+      <View key={item._id} style={styles.card}>
+        <View style={styles.topRow}>
+          <Text style={styles.title}>
+            {item.weeklyTestId?.title || item.weeklyTestId?.weekName || `${item.category || 'Weekly'} Test`}
+          </Text>
+          <Text style={styles.dateText}>
+            {item.submittedAt ? new Date(item.submittedAt).toLocaleDateString() : ''}
+          </Text>
+        </View>
 
-      <View style={styles.badgeRow}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Submitted Successfully</Text>
+        <Text style={styles.subText}>
+          Topic: {item.category || item.weeklyTestId?.topic || 'Weekly Exam'}
+        </Text>
+
+        {/* Score Row */}
+        <View style={styles.scoreRow}>
+          <View style={styles.scoreCol}>
+            <Text style={styles.scoreNumber}>{item.score ?? 0} / {item.total ?? 0}</Text>
+            <Text style={styles.scoreLabel}>Score</Text>
+          </View>
+          <View style={styles.scoreCol}>
+            <Text style={[styles.scoreNumber, { color: COLORS.success }]}>{item.correctAnswers ?? 0}</Text>
+            <Text style={styles.scoreLabel}>Correct</Text>
+          </View>
+          <View style={styles.scoreCol}>
+            <Text style={[styles.scoreNumber, { color: COLORS.danger }]}>{item.wrongAnswers ?? 0}</Text>
+            <Text style={styles.scoreLabel}>Wrong</Text>
+          </View>
+        </View>
+
+        {/* Review Action */}
+        <View style={styles.actionRow}>
+          {isLocked ? (
+            <TouchableOpacity
+              style={styles.lockedBtn}
+              onPress={() => router.push('/view-mistakes', { id: item._id })}
+            >
+              <Text style={styles.lockedBtnText}>
+                🔒 Review Mistakes (Unlocks in {hoursRemaining}h {minutesRemaining}m)
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.unlockedBtn}
+              onPress={() => router.push('/view-mistakes', { id: item._id })}
+            >
+              <Text style={styles.unlockedBtnText}>
+                📋 Review Mistakes & Answers →
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <ProtectedRoute roleRequired="student">
@@ -129,21 +181,61 @@ const styles = StyleSheet.create({
   subText: {
     fontSize: 13,
     color: COLORS.gray600,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  badgeRow: {
+  scoreRow: {
     flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    justifyContent: 'space-around',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  badge: {
-    backgroundColor: COLORS.selectedBg,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  scoreCol: {
+    alignItems: 'center',
   },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+  scoreNumber: {
+    fontSize: 16,
+    fontWeight: '800',
     color: COLORS.primary,
+  },
+  scoreLabel: {
+    fontSize: 11,
+    color: COLORS.gray600,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  actionRow: {
+    marginTop: 2,
+  },
+  lockedBtn: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  lockedBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1d4ed8',
+  },
+  unlockedBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  unlockedBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   emptyCard: {
     padding: 30,

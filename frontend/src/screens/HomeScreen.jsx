@@ -63,8 +63,11 @@ export default function HomeScreen() {
     });
   };
 
+  const currentStreak = user?.dailyStreak || 1;
+  const streakLabel = `🔥 ${currentStreak} Day${currentStreak > 1 ? 's' : ''}`;
+
   const handleStreakPress = () => {
-    const message = '🔥 Daily Streak Active!\n\nConsistency is the key to cracking aptitude interviews. Take your weekly test and practice topic quizzes daily to level up your skills!';
+    const message = `🔥 Daily Streak: ${currentStreak} Day${currentStreak > 1 ? 's' : ''}!\n\nConsistency is the key to cracking aptitude interviews. Practice topic quizzes and weekly tests daily to grow your streak!\n\n🪙 Virtual Coins: ${user?.gameCoins ?? 200}`;
     if (Platform.OS === 'web') {
       window.alert(message);
     } else {
@@ -116,7 +119,7 @@ export default function HomeScreen() {
                   onPress={handleStreakPress}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.streakText}>🔥 3 Days</Text>
+                  <Text style={styles.streakText}>{streakLabel}</Text>
                 </TouchableOpacity>
 
                 {/* Profile Avatar Button */}

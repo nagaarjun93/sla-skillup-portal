@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, View, BackHandler, Alert, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -57,6 +57,40 @@ export default function App() {
       setCurrentRoute(route.name);
     }
   };
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const onBackPress = () => {
+      const rootRoutes = ['home', 'admin-dashboard', 'RoleSelection', 'student-login', 'admin-login'];
+      const activeName = navigationRef.current?.getCurrentRoute()?.name || currentRoute;
+
+      // If already on Home or Login root screen, confirm exit
+      if (rootRoutes.includes(activeName)) {
+        if (activeName === 'home' || activeName === 'admin-dashboard') {
+          Alert.alert('Exit App', 'Are you sure you want to exit SLA SkillUp?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Exit', style: 'destructive', onPress: () => BackHandler.exitApp() },
+          ]);
+          return true;
+        }
+        return false; // allow default back behavior on login
+      }
+
+      // In any other sub-screen, safely navigate back!
+      if (navigationRef.current?.canGoBack()) {
+        navigationRef.current.goBack();
+        return true;
+      } else {
+        // Fallback to home if stack history is empty
+        navigationRef.current?.navigate('home');
+        return true;
+      }
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [currentRoute]);
 
   return (
     <GestureHandlerRootView style={styles.container}>
