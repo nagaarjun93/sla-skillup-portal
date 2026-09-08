@@ -152,16 +152,18 @@ export default function ViewMistakesScreen({ route }) {
                 <Text style={styles.recordedScoreTitle}>Recorded Test Score</Text>
                 <Text style={styles.recordedScoreNumber}>{result.score} / {result.total}</Text>
                 <Text style={styles.recordedScoreSub}>
-                  Correct: {result.correctAnswers || 0} | Incorrect: {result.wrongAnswers || 0}
+                  🔒 Correct & Wrong Answers Hidden until 24-Hour Review Unlock
                 </Text>
               </View>
 
               <TouchableOpacity
                 style={styles.backButtonLarge}
-                onPress={() => router.back('home')}
+                onPress={() => {
+                  router.replace('previous-tests');
+                }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.backButtonText}>← Return to Home Screen</Text>
+                <Text style={styles.backButtonText}>← Return to Test History</Text>
               </TouchableOpacity>
             </View>
           ) : (

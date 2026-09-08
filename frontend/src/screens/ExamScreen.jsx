@@ -197,7 +197,6 @@ export default function ExamScreen() {
         if (Platform.OS === 'web') {
           window.alert(auto ? 'Time Expired! Your test submission has been recorded.' : 'Test Submitted Successfully!');
           router.replace('previous-tests');
-          router.push('previous-tests');
         } else {
           Alert.alert(
             auto ? 'Time Expired' : 'Submitted Successfully',
@@ -207,7 +206,6 @@ export default function ExamScreen() {
                 text: 'OK',
                 onPress: () => {
                   router.replace('previous-tests');
-                  router.push('previous-tests');
                 },
               },
             ]
