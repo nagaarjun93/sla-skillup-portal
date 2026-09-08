@@ -148,14 +148,6 @@ export default function ViewMistakesScreen({ route }) {
                 <Text style={styles.countdownValue}>{countdownStr || 'Calculating...'}</Text>
               </View>
 
-              <View style={styles.recordedScoreBox}>
-                <Text style={styles.recordedScoreTitle}>Recorded Test Score</Text>
-                <Text style={styles.recordedScoreNumber}>{result.score} / {result.total}</Text>
-                <Text style={styles.recordedScoreSub}>
-                  🔒 Correct & Wrong Answers Hidden until 24-Hour Review Unlock
-                </Text>
-              </View>
-
               <TouchableOpacity
                 style={styles.backButtonLarge}
                 onPress={() => {

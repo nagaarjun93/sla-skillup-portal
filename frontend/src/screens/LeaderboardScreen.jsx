@@ -142,15 +142,6 @@ export default function LeaderboardScreen() {
                 <Text style={styles.countdownValue}>{countdownStr || 'Calculating...'}</Text>
               </View>
 
-              {dataState.userScore !== undefined && (
-                <View style={styles.myScoreBox}>
-                  <Text style={styles.myScoreLabel}>Your Submitted Score</Text>
-                  <Text style={styles.myScoreVal}>
-                    {dataState.userScore} / {dataState.userTotal}
-                  </Text>
-                </View>
-              )}
-
               <TouchableOpacity
                 style={styles.actionBtn}
                 onPress={() => router.back('home')}

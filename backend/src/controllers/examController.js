@@ -250,8 +250,6 @@ exports.getLeaderboard = async (req, res, next) => {
           testTitle,
           testId: targetWeeklyTest._id,
           topic: targetWeeklyTest.topic,
-          userScore: studentResult.score,
-          userTotal: studentResult.total,
           msUntilUnlock,
           unlockAt: new Date(submissionTime + TWENTY_FOUR_HOURS_MS).toISOString(),
           message: 'Weekly Test rankings unlock 24 hours after your test submission.'

@@ -70,16 +70,12 @@ export default function PreviousTestsScreen() {
           Topic: {item.category || item.weeklyTestId?.topic || 'Weekly Exam'}
         </Text>
 
-        {/* Score Row: Hide correct/wrong answers when locked */}
+        {/* Score Row: Completely hidden until 24-hour review unlock */}
         {isLocked ? (
           <View style={styles.lockedScoreCard}>
-            <View style={styles.scoreCol}>
-              <Text style={styles.scoreNumber}>{item.score ?? 0} / {item.total ?? 0}</Text>
-              <Text style={styles.scoreLabel}>Score Recorded</Text>
-            </View>
             <View style={styles.lockInfoBadge}>
               <Text style={styles.lockBadgeIcon}>🔒</Text>
-              <Text style={styles.lockBadgeText}>Answers Hidden (24h Lock)</Text>
+              <Text style={styles.lockBadgeText}>Marks & Answers Locked for 24 Hours</Text>
             </View>
           </View>
         ) : (
@@ -178,12 +174,6 @@ export default function PreviousTestsScreen() {
                 <Text style={styles.modalCountdownValue}>
                   {lockModalData?.hoursRemaining} Hours {lockModalData?.minutesRemaining} Mins
                 </Text>
-              </View>
-
-              {/* Recorded Score */}
-              <View style={styles.modalScoreBox}>
-                <Text style={styles.modalScoreLabel}>Your Recorded Score</Text>
-                <Text style={styles.modalScoreVal}>{lockModalData?.score}</Text>
               </View>
 
               <TouchableOpacity
