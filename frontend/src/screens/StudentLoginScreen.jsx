@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useUniversalRouter } from '../utils/useUniversalRouter';
@@ -51,11 +50,19 @@ export default function StudentLoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.headerBox}>
-          <Image
-            source={require('../../assets/sla_building.png')}
-            style={styles.logoImage}
-            resizeMode="cover"
-          />
+          <View style={styles.logoIconCircle}>
+            <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M12 3L1 9L12 15L21 10.09V17H23V9L12 3Z"
+                fill="#ffffff"
+              />
+              <Path
+                d="M5 13.18V17.18C5 19.94 8.13 22 12 22C15.87 22 19 19.94 19 17.18V13.18L12 17L5 13.18Z"
+                fill="#ffffff"
+                fillOpacity={0.88}
+              />
+            </Svg>
+          </View>
           <Text style={styles.brandTitle}>SLA SkillUp</Text>
           <Text style={styles.subTitle}>Student Aptitude Portal Login</Text>
         </View>
@@ -155,17 +162,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  logoImage: {
+  logoIconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
     borderWidth: 3,
     borderColor: '#ffffff',
-    marginBottom: 12,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 6 },
-      android: { elevation: 4 },
-      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+      ios: { shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10 },
+      android: { elevation: 6 },
+      web: { boxShadow: '0 6px 16px rgba(30, 58, 138, 0.25)' },
     }),
   },
   brandTitle: {
