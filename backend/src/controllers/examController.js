@@ -178,29 +178,135 @@ exports.submitExamResult = async (req, res, next) => {
 // GET /api/leaderboard
 exports.getLeaderboard = async (req, res, next) => {
   try {
-    const { category, weeklyTestId } = req.query;
-    const filter = {};
-    if (category) filter.category = category;
-    if (weeklyTestId) filter.weeklyTestId = weeklyTestId;
+    const { weeklyTestId } = req.query;
+    const userId = req.user ? req.user.id : null;
+    const userRole = req.user ? req.user.role : null;
+    const isAdmin = userRole === 'admin';
 
-    const results = await Result.find(filter)
+    // 1. Resolve which Weekly Test this leaderboard is for
+    let targetWeeklyTest = null;
+    if (weeklyTestId) {
+      targetWeeklyTest = await WeeklyTest.findById(weeklyTestId);
+    } else {
+      // Find active weekly test, or if none active, the most recently created weekly test
+      const now = new Date();
+      targetWeeklyTest = await WeeklyTest.findOne({
+        active: true,
+        $or: [
+          { startTime: { $exists: false } },
+          { startTime: null },
+          { startTime: { $lte: now } }
+        ]
+      }).sort({ createdAt: -1 });
+
+      if (!targetWeeklyTest) {
+        targetWeeklyTest = await WeeklyTest.findOne().sort({ createdAt: -1 });
+      }
+    }
+
+    if (!targetWeeklyTest) {
+      return res.json({
+        status: 'EMPTY',
+        canViewRanking: false,
+        message: 'No weekly tests found.',
+        leaderboard: []
+      });
+    }
+
+    const testTitle = targetWeeklyTest.title || targetWeeklyTest.weekName || `Week ${targetWeeklyTest.weekNumber || 1} Test`;
+
+    // 2. Strict Filter: ONLY official weekly test results (EXCLUDE topic practice!)
+    const filter = { weeklyTestId: targetWeeklyTest._id };
+
+    // 3. For students: Check submission & 24-hour lock rule
+    if (!isAdmin && userId) {
+      const studentResult = await Result.findOne({
+        student: userId,
+        weeklyTestId: targetWeeklyTest._id
+      });
+
+      if (!studentResult) {
+        return res.json({
+          status: 'NOT_ATTEMPTED',
+          canViewRanking: false,
+          testTitle,
+          testId: targetWeeklyTest._id,
+          topic: targetWeeklyTest.topic,
+          message: 'You must complete this Weekly Test first to view rankings.'
+        });
+      }
+
+      // Check 24 hours lock from student's submission time
+      const submissionTime = new Date(studentResult.submittedAt).getTime();
+      const now = Date.now();
+      const msPassed = now - submissionTime;
+      const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+      if (msPassed < TWENTY_FOUR_HOURS_MS) {
+        const msUntilUnlock = TWENTY_FOUR_HOURS_MS - msPassed;
+        return res.json({
+          status: 'LOCKED',
+          canViewRanking: false,
+          testTitle,
+          testId: targetWeeklyTest._id,
+          topic: targetWeeklyTest.topic,
+          userScore: studentResult.score,
+          userTotal: studentResult.total,
+          msUntilUnlock,
+          unlockAt: new Date(submissionTime + TWENTY_FOUR_HOURS_MS).toISOString(),
+          message: 'Weekly Test rankings unlock 24 hours after your test submission.'
+        });
+      }
+    }
+
+    // 4. Fetch all participants for this weekly test sorted by score DESC and timeTaken ASC
+    const allResults = await Result.find(filter)
       .populate('student', 'name courseName')
-      .sort({ score: -1, timeTaken: 1 })
-      .limit(20);
+      .sort({ score: -1, timeTaken: 1 });
 
-    const leaderboard = results.map((r, index) => ({
-      rank: index + 1,
-      studentName: r.student ? r.student.name : 'Anonymous',
-      courseName: r.student ? r.student.courseName : 'N/A',
-      score: r.score,
-      total: r.total,
-      category: r.category,
-      timeTaken: r.timeTaken,
-      submittedAt: r.submittedAt
-    }));
+    const totalParticipants = allResults.length;
+    let userRank = null;
 
-    res.json(leaderboard);
+    const leaderboard = allResults.slice(0, 50).map((r, index) => {
+      const rank = index + 1;
+      const isCurrentUser = userId && r.student && r.student._id.toString() === userId.toString();
+      if (isCurrentUser) {
+        userRank = rank;
+      }
+      return {
+        rank,
+        studentId: r.student ? r.student._id : null,
+        studentName: r.student ? r.student.name : 'Anonymous',
+        courseName: r.student ? r.student.courseName : 'N/A',
+        score: r.score,
+        total: r.total,
+        category: r.category,
+        timeTaken: r.timeTaken,
+        submittedAt: r.submittedAt,
+        isCurrentUser
+      };
+    });
+
+    // If student rank was beyond top 50, calculate exact rank
+    if (userId && !userRank) {
+      const idx = allResults.findIndex(r => r.student && r.student._id.toString() === userId.toString());
+      if (idx !== -1) {
+        userRank = idx + 1;
+      }
+    }
+
+    res.json({
+      status: 'UNLOCKED',
+      canViewRanking: true,
+      testTitle,
+      testId: targetWeeklyTest._id,
+      topic: targetWeeklyTest.topic,
+      userRank,
+      totalParticipants,
+      leaderboard
+    });
   } catch (error) {
     next(error);
   }
 };
+

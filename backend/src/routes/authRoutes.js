@@ -19,5 +19,7 @@ router.get('/students/profile', protect, authController.getStudentProfile);
 router.get('/student/game/status', protect, gameController.getGameStatus);
 router.post('/student/game/spin', protect, gameController.recordSpin);
 router.post('/student/game/claim-streak', protect, gameController.claimStreakBonus);
+router.post('/student/game/award-coins', protect, gameController.awardCoins);
 
 module.exports = router;
+

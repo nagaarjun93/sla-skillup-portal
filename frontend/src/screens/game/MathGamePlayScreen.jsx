@@ -59,6 +59,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
 
   const timerRef = useRef(null);
   const isFinishedRef = useRef(false);
+  const mistakesRef = useRef([]);
 
   // Animations
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -208,6 +209,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
         starsEarned,
         unlockedNext,
         coinsEarned,
+        mistakesList: mistakesRef.current || [],
         isBoss: levelMeta?.isBoss,
         bossName: levelMeta?.bossName,
         bossAvatar: levelMeta?.bossAvatar,
@@ -226,6 +228,14 @@ export default function MathGamePlayScreen({ route, navigation }) {
       finishGameRound(score, correctCount, wrongCount, maxStreak);
     } else {
       // In level or practice mode: current question timed out!
+      if (currentQuestion) {
+        mistakesRef.current.push({
+          question: currentQuestion.question || currentQuestion.expression,
+          userAnswer: 'Timed Out ⏱️',
+          correctAnswer: currentQuestion.answer,
+          tip: currentQuestion.tip || currentQuestion.trickTitle || ''
+        });
+      }
       triggerHapticFeedback(false);
       triggerVisualAnimation(false);
       const nextWrong = wrongCount + 1;
@@ -241,6 +251,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
     }
   }, [
     isSpeedMode,
+    currentQuestion,
     score,
     correctCount,
     wrongCount,
@@ -301,6 +312,14 @@ export default function MathGamePlayScreen({ route, navigation }) {
       }
     } else {
       // Wrong answer
+      if (currentQuestion) {
+        mistakesRef.current.push({
+          question: currentQuestion.question || currentQuestion.expression,
+          userAnswer: userInput.trim() || 'Empty',
+          correctAnswer: currentQuestion.answer,
+          tip: currentQuestion.tip || currentQuestion.trickTitle || ''
+        });
+      }
       setStreak(0);
       const nextWrong = wrongCount + 1;
       setWrongCount(nextWrong);

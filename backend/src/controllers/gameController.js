@@ -108,3 +108,33 @@ exports.claimStreakBonus = async (req, res, next) => {
     next(error);
   }
 };
+
+// POST /api/student/game/award-coins
+exports.awardCoins = async (req, res, next) => {
+  try {
+    const { amount, reason } = req.body;
+    const coinsToAdd = Number(amount);
+    if (!coinsToAdd || isNaN(coinsToAdd) || coinsToAdd <= 0 || coinsToAdd > 10000) {
+      return res.status(400).json({ success: false, message: 'Invalid coins amount' });
+    }
+
+    const student = await Student.findById(req.user.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    student.gameCoins = (student.gameCoins ?? 200) + coinsToAdd;
+    await student.save();
+
+    res.json({
+      success: true,
+      coinsAdded: coinsToAdd,
+      totalCoins: student.gameCoins,
+      reason: reason || 'game_reward'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+

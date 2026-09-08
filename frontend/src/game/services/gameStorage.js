@@ -182,12 +182,26 @@ export async function loadGameEconomy() {
 }
 
 /**
- * Add virtual coins
+ * Add virtual coins (Synced to MongoDB Atlas)
  */
 export async function addCoins(amount) {
   try {
     const economy = await loadGameEconomy();
-    const newCoins = Math.max(0, (economy.coins || 0) + amount);
+    let newCoins = Math.max(0, (economy.coins || 0) + amount);
+
+    // Sync to MongoDB Cloud!
+    try {
+      const { data } = await api.post('/student/game/award-coins', {
+        amount,
+        reason: 'level_completion'
+      });
+      if (data && data.success && data.totalCoins !== undefined) {
+        newCoins = data.totalCoins;
+      }
+    } catch (apiErr) {
+      // Offline fallback: use local calculation
+    }
+
     const updated = { ...economy, coins: newCoins };
     await AsyncStorage.setItem(STORAGE_KEYS.ECONOMY, JSON.stringify(updated));
     return newCoins;
@@ -196,6 +210,7 @@ export async function addCoins(amount) {
     return 0;
   }
 }
+
 
 /**
  * Spend virtual coins
