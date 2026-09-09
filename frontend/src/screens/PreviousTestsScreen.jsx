@@ -75,22 +75,22 @@ export default function PreviousTestsScreen() {
           <View style={styles.lockedScoreCard}>
             <View style={styles.lockInfoBadge}>
               <Text style={styles.lockBadgeIcon}>🔒</Text>
-              <Text style={styles.lockBadgeText}>Marks & Answers Locked for 24 Hours</Text>
+              <Text style={styles.lockBadgeText}>Review & Answers Locked for 24 Hours</Text>
             </View>
           </View>
         ) : (
           <View style={styles.scoreRow}>
             <View style={styles.scoreCol}>
-              <Text style={styles.scoreNumber}>{item.score ?? 0} / {item.total ?? 0}</Text>
-              <Text style={styles.scoreLabel}>Score</Text>
+              <Text style={[styles.scoreNumber, { color: COLORS.success, fontSize: 15 }]}>Completed ✅</Text>
+              <Text style={styles.scoreLabel}>Status</Text>
             </View>
             <View style={styles.scoreCol}>
-              <Text style={[styles.scoreNumber, { color: COLORS.success }]}>{item.correctAnswers ?? 0}</Text>
-              <Text style={styles.scoreLabel}>Correct</Text>
+              <Text style={styles.scoreNumber}>{item.total ?? 0}</Text>
+              <Text style={styles.scoreLabel}>Total Questions</Text>
             </View>
             <View style={styles.scoreCol}>
-              <Text style={[styles.scoreNumber, { color: COLORS.danger }]}>{item.wrongAnswers ?? 0}</Text>
-              <Text style={styles.scoreLabel}>Wrong</Text>
+              <Text style={[styles.scoreNumber, { color: COLORS.primary, fontSize: 15 }]}>Recorded</Text>
+              <Text style={styles.scoreLabel}>Submission</Text>
             </View>
           </View>
         )}

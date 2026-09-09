@@ -109,7 +109,7 @@ export default function LeaderboardScreen() {
 
         <View style={styles.scoreBox}>
           <Text style={[styles.scoreText, isMe && { color: COLORS.secondary }]}>
-            {item.score} / {item.total}
+            Rank #{item.rank}
           </Text>
         </View>
       </View>

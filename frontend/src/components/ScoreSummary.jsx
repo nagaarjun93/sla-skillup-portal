@@ -2,7 +2,29 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SHADOWS } from '../styles/theme';
 
-export default function ScoreSummary({ score, total, correctAnswers, wrongAnswers }) {
+export default function ScoreSummary({ score, total, correctAnswers, wrongAnswers, isStudent = false }) {
+  if (isStudent) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.headerTitle}>Test Review Summary</Text>
+        <View style={styles.scoreRow}>
+          <View style={styles.scoreBox}>
+            <Text style={styles.scoreNumber}>{total}</Text>
+            <Text style={styles.scoreLabel}>Total Questions</Text>
+          </View>
+        </View>
+        <View style={styles.breakdownRow}>
+          <Text style={[styles.breakdownText, { color: COLORS.success }]}>
+            ✓ Correct: {correctAnswers !== undefined ? correctAnswers : 0}
+          </Text>
+          <Text style={[styles.breakdownText, { color: COLORS.danger }]}>
+            ✗ Mistakes to Review: {wrongAnswers !== undefined ? wrongAnswers : 0}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <Text style={styles.headerTitle}>Score Summary (Admin View)</Text>

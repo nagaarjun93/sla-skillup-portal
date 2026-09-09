@@ -14,10 +14,11 @@ import ScoreSummary from '../components/ScoreSummary';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { adminService } from '../services/adminService';
 import { mockService } from '../services/mockService';
-import api from '../services/api';
+import { useArjunAuth } from '../context/AuthContext';
 import { COLORS, SHADOWS } from '../styles/theme';
 
 export default function ViewMistakesScreen({ route }) {
+  const { role } = useArjunAuth();
   const router = useUniversalRouter();
   const activeId = route?.params?.id || router.params?.id;
   const isMockParam = route?.params?.isMock || router.params?.isMock;
@@ -176,6 +177,7 @@ export default function ViewMistakesScreen({ route }) {
                 total={result.total}
                 correctAnswers={result.correctAnswers}
                 wrongAnswers={result.wrongAnswers}
+                isStudent={role !== 'admin'}
               />
 
               <View style={styles.answersSection}>

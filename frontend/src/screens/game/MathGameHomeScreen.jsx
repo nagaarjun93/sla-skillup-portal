@@ -20,6 +20,9 @@ import {
 } from '../../game/services/gameStorage';
 import DailySpinModal from '../../game/components/DailySpinModal';
 import DailyStreakModal from '../../game/components/DailyStreakModal';
+import Navbar from '../../components/Navbar';
+import ProtectedRoute from '../../components/ProtectedRoute';
+import { COLORS } from '../../styles/theme';
 
 export default function MathGameHomeScreen({ navigation }) {
   const { user } = useArjunAuth();
@@ -108,9 +111,17 @@ export default function MathGameHomeScreen({ navigation }) {
   const progressPercent = Math.min(100, Math.round((completed / 50) * 100));
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-      {/* HERO GAMING HEADER */}
-      <View style={styles.heroCard}>
+    <ProtectedRoute allowedRoles={['student']}>
+      <View style={styles.screenWrapper}>
+        <Navbar
+          title="Speed Math Arena"
+          showBack={true}
+          onBack={() => navigation.navigate('home')}
+        />
+
+        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+          {/* HERO GAMING HEADER */}
+          <View style={styles.heroCard}>
         {/* Top bar inside hero: Greeting, Rank, Sound */}
         <View style={styles.heroTopRow}>
           <View style={styles.heroPlayerInfo}>
@@ -261,7 +272,7 @@ export default function MathGameHomeScreen({ navigation }) {
         </View>
       )}
 
-      {/* 3-MONTH COURSE REWARDS STORE BANNER */}
+      {/* GAME REWARDS & COIN STORE BANNER */}
       <TouchableOpacity
         style={styles.storeCardBanner}
         onPress={() => navigation.navigate('math-game-store')}
@@ -273,13 +284,13 @@ export default function MathGameHomeScreen({ navigation }) {
           </View>
           <View style={styles.storeTextCol}>
             <View style={styles.storeBadgeRow}>
-              <Text style={styles.storeHeading}>3-Month Course Rewards Store</Text>
+              <Text style={styles.storeHeading}>Rewards & Badges Store</Text>
               <View style={styles.storeBadgeHot}>
-                <Text style={styles.storeBadgeHotText}>NEW PASSES</Text>
+                <Text style={styles.storeBadgeHotText}>STORE</Text>
               </View>
             </View>
             <Text style={styles.storeDescription}>
-              Unlock Stage 1 (5,000🪙), Stage 2 (12,000🪙), and Grand Finale Exam Passes + Avatar Badges!
+              Exchange your game coins for exclusive avatar borders, gamer titles, and gameplay boosters!
             </Text>
           </View>
         </View>
@@ -507,14 +518,20 @@ export default function MathGameHomeScreen({ navigation }) {
         canClaimStreak={economy.canClaimStreak}
         onStreakClaimed={() => refreshData()}
       />
-    </ScrollView>
+        </ScrollView>
+      </View>
+    </ProtectedRoute>
   );
 }
 
 const styles = StyleSheet.create({
+  screenWrapper: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#0a0d24', // Deep midnight arcade background
+    backgroundColor: '#f8fafc',
   },
   contentContainer: {
     padding: 16,
@@ -523,26 +540,26 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
-  // HERO CARD
+  // HERO CARD - SLA Navy Signature
   heroCard: {
-    backgroundColor: '#13193a',
-    borderRadius: 24,
+    backgroundColor: '#1e3a8a',
+    borderRadius: 22,
     padding: 18,
     borderWidth: 1.5,
-    borderColor: '#242e66',
+    borderColor: '#3b82f6',
     marginBottom: 16,
     ...Platform.select({
       ios: {
-        shadowColor: '#3b82f6',
-        shadowOffset: { width: 0, height: 6 },
+        shadowColor: '#1e3a8a',
+        shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.25,
-        shadowRadius: 12,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 6,
+        elevation: 5,
       },
       web: {
-        boxShadow: '0 6px 20px rgba(59, 130, 246, 0.2)',
+        boxShadow: '0 5px 16px rgba(30, 58, 138, 0.2)',
       },
     }),
   },
@@ -561,9 +578,9 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#1e2858',
+    backgroundColor: '#172554',
     borderWidth: 2,
-    borderColor: '#f59e0b',
+    borderColor: '#fbbf24',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -591,26 +608,26 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   soundButton: {
-    backgroundColor: '#1e2858',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#3a4a8c',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   soundButtonText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#93c5fd',
+    color: '#ffffff',
   },
 
   // JOURNEY PROGRESS
   journeyBox: {
-    backgroundColor: '#0c102b',
+    backgroundColor: '#172554',
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#1e2858',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     marginBottom: 14,
   },
   journeyHeader: {
@@ -622,7 +639,7 @@ const styles = StyleSheet.create({
   journeyTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#cbd5e1',
+    color: '#e2e8f0',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -639,7 +656,7 @@ const styles = StyleSheet.create({
   },
   journeyFill: {
     height: '100%',
-    backgroundColor: '#10b981',
+    backgroundColor: '#38bdf8',
     borderRadius: 4,
   },
 
@@ -661,20 +678,20 @@ const styles = StyleSheet.create({
   },
   statMax: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#cbd5e1',
     fontWeight: '600',
   },
   heroStatLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#cbd5e1',
     marginTop: 2,
     textTransform: 'uppercase',
   },
   heroStatDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#242e66',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
 
   // VAULT BAR
@@ -773,8 +790,8 @@ const styles = StyleSheet.create({
 
   // DAILY EVENT BANNER
   eventBanner: {
-    backgroundColor: '#3b0764',
-    borderColor: '#c084fc',
+    backgroundColor: '#fdf4ff',
+    borderColor: '#e879f9',
     borderWidth: 1.5,
     borderRadius: 18,
     padding: 12,
@@ -784,16 +801,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     ...Platform.select({
       ios: {
-        shadowColor: '#c084fc',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowColor: '#a855f7',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 4,
+        elevation: 2,
       },
       web: {
-        boxShadow: '0 4px 12px rgba(192, 132, 252, 0.25)',
+        boxShadow: '0 2px 8px rgba(168, 85, 247, 0.12)',
       },
     }),
   },
@@ -813,11 +830,11 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#f5d0fe',
+    color: '#86198f',
   },
   eventSubtitle: {
     fontSize: 10,
-    color: '#e9d5ff',
+    color: '#a21caf',
     fontWeight: '600',
     marginTop: 2,
     lineHeight: 14,
@@ -846,29 +863,29 @@ const styles = StyleSheet.create({
 
   // STORE CARD BANNER
   storeCardBanner: {
-    backgroundColor: '#1e1b4b',
-    borderRadius: 20,
+    backgroundColor: '#eff6ff',
+    borderRadius: 18,
     padding: 14,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#f59e0b',
-    borderBottomWidth: 5,
-    borderBottomColor: '#b45309',
+    marginBottom: 18,
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe',
+    borderBottomWidth: 3.5,
+    borderBottomColor: '#2563eb',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     ...Platform.select({
       ios: {
-        shadowColor: '#f59e0b',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 5,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 14px rgba(245, 158, 11, 0.2)',
+        boxShadow: '0 3px 10px rgba(37, 99, 235, 0.12)',
       },
     }),
   },
@@ -882,12 +899,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#312e81',
+    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 1.5,
-    borderColor: '#fbbf24',
+    borderColor: '#93c5fd',
   },
   storeIconEmoji: {
     fontSize: 22,
@@ -905,10 +922,10 @@ const styles = StyleSheet.create({
   storeHeading: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#fbbf24',
+    color: '#1e3a8a',
   },
   storeBadgeHot: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#2563eb',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -920,11 +937,11 @@ const styles = StyleSheet.create({
   },
   storeDescription: {
     fontSize: 11,
-    color: '#c7d2fe',
+    color: '#3b82f6',
     lineHeight: 14,
   },
   storeOpenButton: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#1e40af',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
@@ -932,7 +949,7 @@ const styles = StyleSheet.create({
   storeOpenButtonText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#1e1b4b',
+    color: '#ffffff',
   },
 
   // SECTION HEADER
@@ -943,8 +960,8 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#f8fafc',
-    letterSpacing: 1,
+    color: '#0f172a',
+    letterSpacing: 0.5,
   },
   sectionSubHeading: {
     fontSize: 11,

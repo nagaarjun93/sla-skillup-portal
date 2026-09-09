@@ -15,61 +15,49 @@ import {
   equipAvatarFrame,
   fetchStoreCatalog,
 } from '../../game/services/gameStorage';
+import Navbar from '../../components/Navbar';
 
-// Catalog of store items tailored to the 3-month course
+// Catalog of store items tailored to the course
 const STORE_ITEMS = [
-  // --- MOCK EXAM PASSES ---
+  // --- IN-GAME TITLES & BADGES ---
   {
-    id: 'mock_pass_stage_1',
-    category: 'passes',
-    title: 'Mock Test 1 Pass',
-    badge: 'Month 1 Milestone',
-    description: 'Unlocks complete access to the Stage 1 Comprehensive Mock Exam.',
-    cost: 5000,
-    icon: '📝',
+    id: 'badge_vedic_champ',
+    category: 'badges',
+    title: 'Vedic Math Champion Badge',
+    badge: 'Honorary Title',
+    description: 'Showcase your mental calculation prowess on your player profile!',
+    cost: 1000,
+    icon: '⚡',
     color: '#3b82f6',
     bgColor: '#eff6ff',
     borderColor: '#93c5fd',
-    type: 'pass',
+    type: 'badge',
   },
   {
-    id: 'mock_pass_stage_2',
-    category: 'passes',
-    title: 'Mock Test 2 Pass',
-    badge: 'Month 2 Milestone',
-    description: 'Unlocks the Mid-Term Stage 2 High-Difficulty Mock Exam & Analytics.',
-    cost: 12000,
-    icon: '🎯',
-    color: '#8b5cf6',
-    bgColor: '#f5f3ff',
-    borderColor: '#c4b5fd',
-    type: 'pass',
-  },
-  {
-    id: 'mock_pass_finale',
-    category: 'passes',
-    title: 'Grand Mock Exam Finale',
-    badge: 'Month 3 Graduation',
-    description: 'The Ultimate 3-Month Graduation Mock Exam + Official Certificate Eligibility!',
-    cost: 25000,
-    icon: '👑',
+    id: 'badge_speed_demon',
+    category: 'badges',
+    title: 'Speed Demon Badge',
+    badge: 'Agility Award',
+    description: 'Awarded to scholars who solve complex arithmetic in under 5 seconds.',
+    cost: 2500,
+    icon: '🔥',
     color: '#ea580c',
     bgColor: '#fff7ed',
     borderColor: '#fdba74',
-    type: 'pass',
+    type: 'badge',
   },
   {
-    id: 'mock_retake_token',
-    category: 'passes',
-    title: 'Mock Exam Retake Token',
-    badge: 'Rank Booster',
-    description: 'Allows 1 extra fresh attempt on any locked/completed mock exam.',
-    cost: 2500,
-    icon: '🔄',
-    color: '#10b981',
-    bgColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
-    type: 'pass',
+    id: 'badge_streak_legend',
+    category: 'badges',
+    title: 'Streak Legend Crown',
+    badge: 'Dedication Master',
+    description: 'Exclusive golden crown badge for dedicated daily problem solvers.',
+    cost: 5000,
+    icon: '👑',
+    color: '#8b5cf6',
+    bgColor: '#f5f3ff',
+    borderColor: '#c4b5fd',
+    type: 'badge',
   },
 
   // --- AVATAR FRAMES & BADGES ---
@@ -164,7 +152,7 @@ export default function MathGameStoreScreen({ navigation }) {
     boosterTimeFreezes: 0,
   });
   const [storeCatalog, setStoreCatalog] = useState(STORE_ITEMS);
-  const [activeTab, setActiveTab] = useState('passes'); // 'passes' | 'frames' | 'boosters'
+  const [activeTab, setActiveTab] = useState('badges'); // 'badges' | 'frames' | 'boosters'
   const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchEconomy = useCallback(async () => {
@@ -271,70 +259,64 @@ export default function MathGameStoreScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-          <Text style={styles.backBtnText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>🛍️ Rewards Store</Text>
-        <View style={{ width: 60 }} />
-      </View>
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <Navbar title="Coin Store & Rewards" showBack={true} onBack={handleBack} />
 
-      {/* Coin Wallet Banner */}
-      <View style={styles.walletCard}>
-        <View style={styles.walletLeft}>
-          <Text style={styles.walletEmoji}>🪙</Text>
-          <View>
-            <Text style={styles.walletLabel}>Virtual Coin Wallet</Text>
-            <Text style={styles.walletBalance}>{(economy.coins || 0).toLocaleString()} Coins</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* Coin Wallet Banner */}
+        <View style={styles.walletCard}>
+          <View style={styles.walletLeft}>
+            <Text style={styles.walletEmoji}>🪙</Text>
+            <View>
+              <Text style={styles.walletLabel}>Virtual Coin Wallet</Text>
+              <Text style={styles.walletBalance}>{(economy.coins || 0).toLocaleString()} Coins</Text>
+            </View>
           </View>
+          <TouchableOpacity
+            style={styles.earnMoreBtn}
+            onPress={() => navigation.navigate('math-game-levels')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.earnMoreText}>+ Earn More</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.earnMoreBtn}
-          onPress={() => navigation.navigate('math-game-levels')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.earnMoreText}>+ Earn More</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* 3-Month Progression Notice */}
-      <View style={styles.infoPill}>
-        <Text style={styles.infoPillText}>
-          🎓 <Text style={{ fontWeight: '800' }}>3-Month Course Milestone Store:</Text> Practice math daily to earn real passes for Stage 1, Stage 2, and the Grand Mock Exam Finale!
-        </Text>
-      </View>
-
-      {/* Category Tabs */}
-      <View style={styles.tabsRow}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'passes' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('passes')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'passes' && styles.tabBtnTextActive]}>
-            📝 Mock Passes
+        {/* Official Mock Test Notice */}
+        <View style={styles.infoPill}>
+          <Text style={styles.infoPillText}>
+            ℹ️ <Text style={{ fontWeight: '800' }}>Official Mock Test Access:</Text> Mock Test access is granted and assigned directly by SLA Admin & Trainers for all enrolled students. Store coins can be spent on exclusive in-game badges, avatar frames, and boosters!
           </Text>
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'frames' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('frames')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'frames' && styles.tabBtnTextActive]}>
-            🎭 Badges & Frames
-          </Text>
-        </TouchableOpacity>
+        {/* Category Tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'badges' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('badges')}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'badges' && styles.tabBtnTextActive]}>
+              🏅 Badges & Titles
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'boosters' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('boosters')}
-        >
-          <Text style={[styles.tabBtnText, activeTab === 'boosters' && styles.tabBtnTextActive]}>
-            ⚡ Boosters
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'frames' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('frames')}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'frames' && styles.tabBtnTextActive]}>
+              🎭 Avatar Frames
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'boosters' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('boosters')}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'boosters' && styles.tabBtnTextActive]}>
+              ⚡ Boosters
+            </Text>
+          </TouchableOpacity>
+        </View>
 
       {/* Store Items List */}
       <View style={styles.itemsList}>
@@ -418,7 +400,8 @@ export default function MathGameStoreScreen({ navigation }) {
       {/* Extra bottom padding */}
       <View style={{ height: 80 }} />
     </ScrollView>
-  );
+  </View>
+);
 }
 
 const styles = StyleSheet.create({
