@@ -139,7 +139,7 @@ const QUESTION_GENERATORS = [
 ];
 
 export default function MathGameMultiplayerScreen({ navigation }) {
-  const TARGET_SCORE = 10;
+  const TARGET_SCORE = 6;
   const { user } = useArjunAuth();
 
   // Duel Mode state: 'sla_student' | 'general' | null (modal open)
@@ -279,20 +279,52 @@ export default function MathGameMultiplayerScreen({ navigation }) {
     }
 
     if (player === 'p1') {
-      const nextP1 = Math.max(0, p1Score + (isCorrect ? 1 : -1));
-      setP1Score(nextP1);
-      if (nextP1 >= TARGET_SCORE) {
-        setWinner('p1');
-        recordMatchOutcome('p1');
-        return;
+      if (isCorrect) {
+        // Player 1 advances (+1), Player 2 is pushed back (-1)
+        const nextP1 = Math.min(TARGET_SCORE, p1Score + 1);
+        const nextP2 = Math.max(0, p2Score - 1);
+        setP1Score(nextP1);
+        setP2Score(nextP2);
+        if (nextP1 >= TARGET_SCORE) {
+          setWinner('p1');
+          recordMatchOutcome('p1');
+          return;
+        }
+      } else {
+        // Player 1 wrong penalty: P1 pushed back (-1), P2 advances (+1)
+        const nextP1 = Math.max(0, p1Score - 1);
+        const nextP2 = Math.min(TARGET_SCORE, p2Score + 1);
+        setP1Score(nextP1);
+        setP2Score(nextP2);
+        if (nextP2 >= TARGET_SCORE) {
+          setWinner('p2');
+          recordMatchOutcome('p2');
+          return;
+        }
       }
     } else {
-      const nextP2 = Math.max(0, p2Score + (isCorrect ? 1 : -1));
-      setP2Score(nextP2);
-      if (nextP2 >= TARGET_SCORE) {
-        setWinner('p2');
-        recordMatchOutcome('p2');
-        return;
+      if (isCorrect) {
+        // Player 2 advances (+1), Player 1 is pushed back (-1)
+        const nextP2 = Math.min(TARGET_SCORE, p2Score + 1);
+        const nextP1 = Math.max(0, p1Score - 1);
+        setP2Score(nextP2);
+        setP1Score(nextP1);
+        if (nextP2 >= TARGET_SCORE) {
+          setWinner('p2');
+          recordMatchOutcome('p2');
+          return;
+        }
+      } else {
+        // Player 2 wrong penalty: P2 pushed back (-1), P1 advances (+1)
+        const nextP2 = Math.max(0, p2Score - 1);
+        const nextP1 = Math.min(TARGET_SCORE, p1Score + 1);
+        setP2Score(nextP2);
+        setP1Score(nextP1);
+        if (nextP1 >= TARGET_SCORE) {
+          setWinner('p1');
+          recordMatchOutcome('p1');
+          return;
+        }
       }
     }
 
