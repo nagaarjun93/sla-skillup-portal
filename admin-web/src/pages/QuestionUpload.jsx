@@ -92,61 +92,125 @@ export default function QuestionUpload() {
     }
   };
 
-  const handleFileChange = (e) => {
+  const [filePreviewInfo, setFilePreviewInfo] = useState(null);
+
+  const handleFileChange = async (e) => {
     const selected = e.target.files[0];
     if (selected) {
       if (!selected.name.endsWith('.csv') && !selected.name.endsWith('.txt')) {
         setError('Please select a valid CSV or TXT spreadsheet file');
         setFile(null);
+        setFilePreviewInfo(null);
         return;
       }
       setFile(selected);
       setError('');
       setResult(null);
-    }
-  };
 
-  const splitCsvRow = (text) => {
-    const res = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      if (char === '"') {
-        if (inQuotes && text[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === ',' && !inQuotes) {
-        res.push(current.trim());
-        current = '';
-      } else {
-        current += char;
+      // Read preview of rows
+      try {
+        const text = await selected.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const rowCount = Math.max(0, lines.length - 1);
+        setFilePreviewInfo({
+          fileName: selected.name,
+          detectedRows: rowCount > 0 ? rowCount : lines.length
+        });
+      } catch (err) {
+        setFilePreviewInfo({ fileName: selected.name, detectedRows: 'Ready' });
       }
     }
-    res.push(current.trim());
-    return res;
   };
 
-  const sanitizeAnswer = (val, optA, optB, optC, optD) => {
-    if (!val) return 'A';
-    const raw = String(val).trim().toUpperCase();
-    if (['A', 'B', 'C', 'D'].includes(raw)) return raw;
-    if (raw.startsWith('OPTION')) {
-      const last = raw.replace('OPTION', '').trim();
-      if (['A', 'B', 'C', 'D'].includes(last)) return last;
+  const parseCsvLinesToQuestions = (text, fallbackCategory, fallbackTopic, targetWeeklyId) => {
+    const rawLines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (rawLines.length === 0) return [];
+
+    const firstRowParts = splitCsvRow(rawLines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const hasHeader = firstRowParts.some((h) => h.includes('question') || h.includes('option') || h.includes('ans') || h.includes('problem'));
+
+    let headerIndices = null;
+    if (hasHeader) {
+      headerIndices = {
+        questionText: firstRowParts.findIndex((h) => h.includes('question') || h.includes('problem') || h === 'qtext' || h === 'q'),
+        category: firstRowParts.findIndex((h) => h.includes('cat') || h.includes('subject') || h.includes('domain')),
+        topic: firstRowParts.findIndex((h) => h.includes('top') || h.includes('chapter') || h.includes('unit')),
+        optionA: firstRowParts.findIndex((h) => ['optiona', 'option1', 'opta', 'opt1', 'a', 'choicea', 'choice1', 'ans1'].includes(h)),
+        optionB: firstRowParts.findIndex((h) => ['optionb', 'option2', 'optb', 'opt2', 'b', 'choiceb', 'choice2', 'ans2'].includes(h)),
+        optionC: firstRowParts.findIndex((h) => ['optionc', 'option3', 'optc', 'opt3', 'c', 'choicec', 'choice3', 'ans3'].includes(h)),
+        optionD: firstRowParts.findIndex((h) => ['optiond', 'option4', 'optd', 'opt4', 'd', 'choiced', 'choice4', 'ans4'].includes(h)),
+        correctAnswer: firstRowParts.findIndex((h) => h.includes('correct') || h.includes('answer') || h === 'ans' || h === 'key' || h === 'right'),
+        explanation: firstRowParts.findIndex((h) => h.includes('expla') || h.includes('solu') || h.includes('reason')),
+      };
     }
-    if (raw === '1') return 'A';
-    if (raw === '2') return 'B';
-    if (raw === '3') return 'C';
-    if (raw === '4') return 'D';
-    if (optA && raw === String(optA).trim().toUpperCase()) return 'A';
-    if (optB && raw === String(optB).trim().toUpperCase()) return 'B';
-    if (optC && raw === String(optC).trim().toUpperCase()) return 'C';
-    if (optD && raw === String(optD).trim().toUpperCase()) return 'D';
-    return 'A';
+
+    const dataLines = hasHeader ? rawLines.slice(1) : rawLines;
+    const questions = [];
+
+    dataLines.forEach((line) => {
+      const parts = splitCsvRow(line);
+      if (parts.length < 5) return;
+
+      let qText = '', optA = '', optB = '', optC = '', optD = '', cAns = '', cat = '', top = '', expl = '';
+
+      if (headerIndices && headerIndices.questionText !== -1) {
+        qText = parts[headerIndices.questionText] || '';
+        optA = headerIndices.optionA !== -1 ? parts[headerIndices.optionA] : '';
+        optB = headerIndices.optionB !== -1 ? parts[headerIndices.optionB] : '';
+        optC = headerIndices.optionC !== -1 ? parts[headerIndices.optionC] : '';
+        optD = headerIndices.optionD !== -1 ? parts[headerIndices.optionD] : '';
+        cAns = headerIndices.correctAnswer !== -1 ? parts[headerIndices.correctAnswer] : '';
+        cat = headerIndices.category !== -1 ? parts[headerIndices.category] : '';
+        top = headerIndices.topic !== -1 ? parts[headerIndices.topic] : '';
+        expl = headerIndices.explanation !== -1 ? parts[headerIndices.explanation] : '';
+      } else {
+        // Positional check
+        let offset = 0;
+        if (/^\d+$/.test(String(parts[0]).trim()) && String(parts[1]).trim().length > 5) {
+          offset = 1;
+        }
+
+        if (parts.length >= offset + 8 && ['A','B','C','D','1','2','3','4'].includes(String(parts[offset + 7]).trim().toUpperCase())) {
+          qText = parts[offset];
+          cat = parts[offset + 1];
+          top = parts[offset + 2];
+          optA = parts[offset + 3];
+          optB = parts[offset + 4];
+          optC = parts[offset + 5];
+          optD = parts[offset + 6];
+          cAns = parts[offset + 7];
+          expl = parts[offset + 8] || '';
+        } else {
+          qText = parts[offset];
+          optA = parts[offset + 1];
+          optB = parts[offset + 2];
+          optC = parts[offset + 3];
+          optD = parts[offset + 4];
+          cAns = parts[offset + 5];
+          cat = parts[offset + 6] || '';
+          top = parts[offset + 7] || '';
+          expl = parts[offset + 8] || '';
+        }
+      }
+
+      if (qText && optA && optB && optC && optD) {
+        const finalAnswer = sanitizeAnswer(cAns, optA, optB, optC, optD);
+        questions.push({
+          questionText: qText,
+          optionA: optA,
+          optionB: optB,
+          optionC: optC,
+          optionD: optD,
+          correctAnswer: finalAnswer,
+          explanation: expl || '',
+          category: cat || fallbackCategory || 'General',
+          topic: top || fallbackTopic || 'General',
+          weeklyTestId: targetWeeklyId || null,
+        });
+      }
+    });
+
+    return questions;
   };
 
   const handleUpload = async (e) => {
@@ -156,8 +220,11 @@ export default function QuestionUpload() {
 
     const activeTopicObj = topics.find((t) => t.name === selectedTopicLabel) || {
       name: selectedTopicLabel,
-      category: selectedTopicLabel || 'Vedic Math',
+      category: selectedTopicLabel || 'General',
     };
+
+    const targetCategory = activeTopicObj.category || 'General';
+    const targetTopic = activeTopicObj.name || selectedTopicLabel || 'General';
 
     if (inputMode === 'file') {
       if (!file) {
@@ -166,23 +233,52 @@ export default function QuestionUpload() {
       }
 
       setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      if (selectedWeeklyTestId) {
-        formData.append('weeklyTestId', selectedWeeklyTestId);
-      }
 
       try {
-        const res = await api.post('/admin/questions/upload-csv', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+        // Read file text directly in browser for 100% reliable parsing & bulk insert
+        const fileContent = await file.text();
+        const parsedQuestions = parseCsvLinesToQuestions(
+          fileContent,
+          targetCategory,
+          targetTopic,
+          selectedWeeklyTestId || null
+        );
+
+        if (parsedQuestions.length === 0) {
+          // Fallback to FormData upload endpoint if client parse had 0 rows
+          const formData = new FormData();
+          formData.append('file', file);
+          if (selectedWeeklyTestId) {
+            formData.append('weeklyTestId', selectedWeeklyTestId);
+          }
+          formData.append('category', targetCategory);
+          formData.append('topic', targetTopic);
+
+          const res = await api.post('/admin/questions/upload-csv', formData);
+          setResult(res.data);
+          setFile(null);
+          setFilePreviewInfo(null);
+          fetchWeeklyTests();
+          return;
+        }
+
+        // Save directly via save-bulk
+        const res = await api.post('/admin/questions/save-bulk', {
+          questions: parsedQuestions,
+          weeklyTestId: selectedWeeklyTestId || null,
+          category: targetCategory,
+          topic: targetTopic
         });
-        setResult(res.data);
+
+        setResult({
+          message: `Successfully uploaded and saved ${parsedQuestions.length} questions into Database! 🎉`,
+          inserted: parsedQuestions
+        });
         setFile(null);
+        setFilePreviewInfo(null);
         fetchWeeklyTests();
       } catch (err) {
-        setError(err.response?.data?.message || 'Failed to upload and parse CSV questions');
+        setError(err.response?.data?.message || err.message || 'Failed to upload and parse CSV questions');
       } finally {
         setUploading(false);
       }
@@ -195,83 +291,12 @@ export default function QuestionUpload() {
 
       setUploading(true);
       try {
-        const rawLines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        if (rawLines.length === 0) throw new Error('No content found in text area');
-
-        const firstRowParts = splitCsvRow(rawLines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        const hasHeader = firstRowParts.some((h) => h.includes('question') || h.includes('option') || h.includes('ans'));
-
-        let headerIndices = null;
-        if (hasHeader) {
-          headerIndices = {
-            questionText: firstRowParts.findIndex((h) => h.includes('question')),
-            category: firstRowParts.findIndex((h) => h.includes('cat')),
-            topic: firstRowParts.findIndex((h) => h.includes('top')),
-            optionA: firstRowParts.findIndex((h) => h === 'optiona' || h === 'a' || h === 'opta'),
-            optionB: firstRowParts.findIndex((h) => h === 'optionb' || h === 'b' || h === 'optb'),
-            optionC: firstRowParts.findIndex((h) => h === 'optionc' || h === 'c' || h === 'optc'),
-            optionD: firstRowParts.findIndex((h) => h === 'optiond' || h === 'd' || h === 'optd'),
-            correctAnswer: firstRowParts.findIndex((h) => h.includes('correct') || h.includes('answer') || h === 'ans'),
-            explanation: firstRowParts.findIndex((h) => h.includes('expla')),
-          };
-        }
-
-        const dataLines = hasHeader ? rawLines.slice(1) : rawLines;
-        const questions = [];
-
-        dataLines.forEach((line) => {
-          const parts = splitCsvRow(line);
-          if (parts.length < 5) return;
-
-          let qText = '', optA = '', optB = '', optC = '', optD = '', cAns = '', cat = '', top = '', expl = '';
-
-          if (headerIndices && headerIndices.questionText !== -1) {
-            qText = parts[headerIndices.questionText] || '';
-            optA = headerIndices.optionA !== -1 ? parts[headerIndices.optionA] : '';
-            optB = headerIndices.optionB !== -1 ? parts[headerIndices.optionB] : '';
-            optC = headerIndices.optionC !== -1 ? parts[headerIndices.optionC] : '';
-            optD = headerIndices.optionD !== -1 ? parts[headerIndices.optionD] : '';
-            cAns = headerIndices.correctAnswer !== -1 ? parts[headerIndices.correctAnswer] : '';
-            cat = headerIndices.category !== -1 ? parts[headerIndices.category] : '';
-            top = headerIndices.topic !== -1 ? parts[headerIndices.topic] : '';
-            expl = headerIndices.explanation !== -1 ? parts[headerIndices.explanation] : '';
-          } else if (parts.length >= 8 && (parts[1] === 'Vedic Math' || parts[1] === 'Mock Test' || parts[1] === 'General' || parts[1].length > 15)) {
-            qText = parts[0];
-            cat = parts[1];
-            top = parts[2];
-            optA = parts[3];
-            optB = parts[4];
-            optC = parts[5];
-            optD = parts[6];
-            cAns = parts[7];
-            expl = parts[8] || '';
-          } else {
-            qText = parts[0];
-            optA = parts[1];
-            optB = parts[2];
-            optC = parts[3];
-            optD = parts[4];
-            cAns = parts[5];
-            cat = parts[6];
-            top = parts[7];
-          }
-
-          if (qText && optA && optB && optC && optD) {
-            const finalAnswer = sanitizeAnswer(cAns, optA, optB, optC, optD);
-            questions.push({
-              questionText: qText,
-              optionA: optA,
-              optionB: optB,
-              optionC: optC,
-              optionD: optD,
-              correctAnswer: finalAnswer,
-              explanation: expl || '',
-              category: cat || activeTopicObj.category || 'Vedic Math',
-              topic: top || activeTopicObj.name || selectedTopicLabel || 'Vedic Math',
-              weeklyTestId: selectedWeeklyTestId || null,
-            });
-          }
-        });
+        const questions = parseCsvLinesToQuestions(
+          csvText,
+          targetCategory,
+          targetTopic,
+          selectedWeeklyTestId || null
+        );
 
         if (questions.length === 0) {
           setError('No valid questions parsed. Please ensure each line has Question Text, 4 Options, and Correct Answer.');
@@ -282,6 +307,8 @@ export default function QuestionUpload() {
         const res = await api.post('/admin/questions/save-bulk', {
           questions,
           weeklyTestId: selectedWeeklyTestId || null,
+          category: targetCategory,
+          topic: targetTopic
         });
 
         setResult({

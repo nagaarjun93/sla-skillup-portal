@@ -19,12 +19,16 @@ const api = axios.create({
   }
 });
 
-// Attach Admin JWT Token
+// Attach Admin JWT Token & handle FormData
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('sla_admin_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Crucial for CSV/file uploads: allow browser to set multipart/form-data boundary automatically
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },

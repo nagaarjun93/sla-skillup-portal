@@ -104,6 +104,16 @@ export default function WeeklyTests() {
     }
   };
 
+  const handleActivateTest = async (id) => {
+    try {
+      const res = await api.put(`/admin/weekly/${id}/activate`);
+      alert(res.data?.message || 'Weekly test is now Live for all students! 🚀');
+      fetchWeeklyTests();
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to set test as live');
+    }
+  };
+
   const handleOpenAttachModal = async (test) => {
     setSelectedTest(test);
     setSelectedQuestionIds([]);
@@ -224,13 +234,38 @@ export default function WeeklyTests() {
                     </span>
                   </td>
                   <td>
-                    <span className={`badge ${test.active ? 'badge-active' : 'badge-inactive'}`}>
-                      {test.active ? 'Active' : 'Inactive'}
-                    </span>
+                    {test.active ? (
+                      <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac', fontWeight: '700' }}>
+                        <CheckCircle2 size={12} /> Live for Students
+                      </span>
+                    ) : (
+                      <span className="badge badge-inactive">Inactive</span>
+                    )}
                   </td>
                   <td>{new Date(test.createdAt).toLocaleDateString()}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
+                      {!test.active && (
+                        <button
+                          onClick={() => handleActivateTest(test._id)}
+                          className="btn btn-sm"
+                          style={{
+                            backgroundColor: '#2563eb',
+                            color: '#ffffff',
+                            fontWeight: '700',
+                            padding: '4px 10px',
+                            fontSize: '12px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Activate this test immediately as the current Live weekly test for all students"
+                        >
+                          <span>⚡ Make Live</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOpenAttachModal(test)}
                         className="btn btn-secondary btn-sm"

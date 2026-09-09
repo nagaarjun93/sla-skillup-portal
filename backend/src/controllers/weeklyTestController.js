@@ -11,6 +11,12 @@ exports.createWeeklyTest = async (req, res, next) => {
       return res.status(400).json({ message: 'weekName, topic, and duration are required' });
     }
 
+    const isActive = active !== undefined ? (active === true || active === 'true') : true;
+    if (isActive) {
+      // Deactivate older tests so there is a single clear active test for students
+      await WeeklyTest.updateMany({}, { active: false });
+    }
+
     const test = await WeeklyTest.create({
       weekNumber,
       title,
@@ -19,9 +25,9 @@ exports.createWeeklyTest = async (req, res, next) => {
       description,
       totalQuestions: totalQuestions || 0,
       duration,
-      startTime,
-      endTime,
-      active: active !== undefined ? active : true,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      active: isActive,
       passMarks: passMarks !== undefined ? Number(passMarks) : 0,
       passPercentage: passPercentage !== undefined ? Number(passPercentage) : 50
     });
@@ -35,11 +41,31 @@ exports.createWeeklyTest = async (req, res, next) => {
 // PUT /api/admin/weekly/:id
 exports.updateWeeklyTest = async (req, res, next) => {
   try {
+    if (req.body.active === true || req.body.active === 'true') {
+      await WeeklyTest.updateMany({ _id: { $ne: req.params.id } }, { active: false });
+    }
     const test = await WeeklyTest.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!test) {
       return res.status(404).json({ message: 'Weekly test not found' });
     }
     res.json(test);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PUT /api/admin/weekly/:id/activate
+exports.activateWeeklyTest = async (req, res, next) => {
+  try {
+    await WeeklyTest.updateMany({ _id: { $ne: req.params.id } }, { active: false });
+    const test = await WeeklyTest.findByIdAndUpdate(req.params.id, {
+      active: true,
+      startTime: null
+    }, { new: true });
+    if (!test) {
+      return res.status(404).json({ message: 'Weekly test not found' });
+    }
+    res.json({ message: `"${test.title || test.weekName}" is now the Live Weekly Test for all students! 🚀`, test });
   } catch (error) {
     next(error);
   }
@@ -79,6 +105,7 @@ exports.addQuestionsToWeeklyTest = async (req, res, next) => {
 
     const questionCount = await Question.countDocuments({ weeklyTestId: test._id });
     test.totalQuestions = questionCount;
+    test.active = true;
     await test.save();
 
     res.json({ message: `${questionIds.length} questions attached to weekly test`, test });
@@ -101,20 +128,32 @@ exports.getAllWeeklyTestsAdmin = async (req, res, next) => {
 exports.getActiveWeeklyTest = async (req, res, next) => {
   try {
     const now = new Date();
-    const activeTest = await WeeklyTest.findOne({
+    // 1. Prioritize explicitly active test whose endTime hasn't expired
+    let activeTest = await WeeklyTest.findOne({
       active: true,
       $or: [
-        { startTime: { $exists: false } },
-        { startTime: null },
-        { startTime: { $lte: now } }
+        { endTime: { $exists: false } },
+        { endTime: null },
+        { endTime: { $gt: now } }
       ]
     }).sort({ createdAt: -1 });
+
+    // 2. Fallback: if all active tests have ended, still allow the most recently active one
+    if (!activeTest) {
+      activeTest = await WeeklyTest.findOne({ active: true }).sort({ createdAt: -1 });
+    }
 
     if (!activeTest) {
       return res.status(404).json({ message: 'No active weekly test found currently' });
     }
 
     const questions = await Question.find({ weeklyTestId: activeTest._id }).select('-correctAnswer -explanation');
+
+    // Auto-sync totalQuestions if count mismatch
+    if (activeTest.totalQuestions !== questions.length) {
+      await WeeklyTest.findByIdAndUpdate(activeTest._id, { totalQuestions: questions.length });
+      activeTest.totalQuestions = questions.length;
+    }
 
     let alreadyAttempted = false;
     let attemptedAt = null;
@@ -130,6 +169,7 @@ exports.getActiveWeeklyTest = async (req, res, next) => {
     res.json({
       test: {
         ...activeTest.toObject(),
+        status: 'Live', // Guaranteed Live status so Attempt button is always enabled
         alreadyAttempted,
         attemptedAt
       },

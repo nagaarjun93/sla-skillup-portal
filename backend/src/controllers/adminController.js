@@ -110,6 +110,15 @@ exports.uploadQuestionsCsv = async (req, res, next) => {
       return res.status(400).json({ message: 'No valid questions could be parsed from the CSV file. Please check column headers and content.' });
     }
 
+    let fallbackCategory = category || 'General';
+    let fallbackTopic = topic || 'General';
+    if (weeklyTestId) {
+      const targetWeekly = await WeeklyTest.findById(weeklyTestId);
+      if (targetWeekly) {
+        fallbackTopic = targetWeekly.topic || fallbackTopic;
+      }
+    }
+
     const questionsToInsert = rawQuestions.map(q => ({
       questionText: q.questionText,
       optionA: q.optionA,
@@ -117,8 +126,8 @@ exports.uploadQuestionsCsv = async (req, res, next) => {
       optionC: q.optionC,
       optionD: q.optionD,
       correctAnswer: q.correctAnswer || 'A',
-      category: q.category && q.category !== 'General' ? q.category : (category || q.category || 'General'),
-      topic: q.topic && q.topic !== 'General' ? q.topic : (topic || q.topic || 'General'),
+      category: q.category && q.category !== 'General' ? q.category : fallbackCategory,
+      topic: q.topic && q.topic !== 'General' ? q.topic : fallbackTopic,
       difficultyLevel: q.difficultyLevel || 'Medium',
       explanation: q.explanation || '',
       weeklyTestId: weeklyTestId || null
@@ -128,7 +137,13 @@ exports.uploadQuestionsCsv = async (req, res, next) => {
 
     if (weeklyTestId) {
       const count = await Question.countDocuments({ weeklyTestId });
-      await WeeklyTest.findByIdAndUpdate(weeklyTestId, { totalQuestions: count });
+      // Deactivate older tests and activate target test so student app immediately receives it
+      await WeeklyTest.updateMany({ _id: { $ne: weeklyTestId } }, { active: false });
+      await WeeklyTest.findByIdAndUpdate(weeklyTestId, {
+        totalQuestions: count,
+        active: true,
+        startTime: null
+      });
     }
 
     res.status(201).json({
@@ -172,7 +187,7 @@ exports.parseQuestionsFile = async (req, res, next) => {
 // POST /api/admin/questions/save-bulk
 exports.saveBulkQuestions = async (req, res, next) => {
   try {
-    const { questions, weeklyTestId } = req.body;
+    const { questions, weeklyTestId, category, topic } = req.body;
     if (!Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ message: 'Questions array is required' });
     }
@@ -182,18 +197,34 @@ exports.saveBulkQuestions = async (req, res, next) => {
       return res.status(400).json({ message: 'No valid questions found. Each question must have question text and 4 options.' });
     }
 
+    let fallbackTopic = topic || 'General';
+    let fallbackCategory = category || 'General';
+    const targetWeeklyId = weeklyTestId || (questions[0] && questions[0].weeklyTestId);
+    if (targetWeeklyId) {
+      const targetWeekly = await WeeklyTest.findById(targetWeeklyId);
+      if (targetWeekly) {
+        fallbackTopic = targetWeekly.topic || fallbackTopic;
+      }
+    }
+
     const questionsToInsert = validQuestions.map(q => ({
       ...q,
       correctAnswer: (q.correctAnswer || 'A').toUpperCase(),
-      weeklyTestId: q.weeklyTestId || weeklyTestId || null
+      category: q.category && q.category !== 'General' ? q.category : fallbackCategory,
+      topic: q.topic && q.topic !== 'General' ? q.topic : fallbackTopic,
+      weeklyTestId: q.weeklyTestId || targetWeeklyId || null
     }));
 
     const inserted = await Question.insertMany(questionsToInsert);
 
-    const targetWeeklyId = weeklyTestId || (questions[0] && questions[0].weeklyTestId);
     if (targetWeeklyId) {
       const count = await Question.countDocuments({ weeklyTestId: targetWeeklyId });
-      await WeeklyTest.findByIdAndUpdate(targetWeeklyId, { totalQuestions: count });
+      await WeeklyTest.updateMany({ _id: { $ne: targetWeeklyId } }, { active: false });
+      await WeeklyTest.findByIdAndUpdate(targetWeeklyId, {
+        totalQuestions: count,
+        active: true,
+        startTime: null
+      });
     }
 
     res.status(201).json({ message: `${inserted.length} questions saved`, count: inserted.length, questions: inserted });

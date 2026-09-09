@@ -59,13 +59,16 @@ const weeklyTestSchema = new mongoose.Schema({
 
 weeklyTestSchema.virtual('status').get(function() {
   const now = new Date();
-  if (this.startTime && now < this.startTime) {
-    return 'Upcoming';
-  }
   if (this.endTime && now > this.endTime) {
     return 'Completed';
   }
-  return 'Live';
+  if (this.active) {
+    return 'Live';
+  }
+  if (this.startTime && now < this.startTime) {
+    return 'Upcoming';
+  }
+  return 'Inactive';
 });
 
 module.exports = mongoose.model('WeeklyTest', weeklyTestSchema);
