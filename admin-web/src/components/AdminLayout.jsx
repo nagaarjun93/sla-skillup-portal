@@ -13,7 +13,9 @@ import {
   LogOut,
   ShieldCheck,
   User,
-  ChevronDown
+  ChevronDown,
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function AdminLayout() {
@@ -21,7 +23,12 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -56,53 +63,102 @@ export default function AdminLayout() {
 
   return (
     <div className="app-container">
+      {/* Mobile Drawer Overlay */}
+      {mobileNavOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileNavOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo-icon">S</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div className="sidebar-brand-title">SLA SkillUp</div>
             <div className="sidebar-brand-sub">Admin Portal</div>
           </div>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close sidebar"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">
           <div className="nav-section-label">Main</div>
-          <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
+          <NavLink
+            to="/"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            end
+            onClick={() => setMobileNavOpen(false)}
+          >
             <LayoutDashboard />
             <span>Dashboard</span>
           </NavLink>
 
           <div className="nav-section-label">Questions & Tests</div>
-          <NavLink to="/upload-questions" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/upload-questions"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <UploadCloud />
             <span>Weekly Test Qs Upload</span>
           </NavLink>
-          <NavLink to="/weekly-tests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/weekly-tests"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <Calendar />
             <span>Weekly Tests</span>
           </NavLink>
-          <NavLink to="/this-week-questions" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/this-week-questions"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <FileText />
             <span>This Week's Qs</span>
           </NavLink>
 
           <div className="nav-section-label">Students & Results</div>
-          <NavLink to="/students" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/students"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <Users />
             <span>Student & Mock Test Access</span>
           </NavLink>
-          <NavLink to="/results" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/results"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <CheckSquare />
             <span>Weekly Results</span>
           </NavLink>
 
           <div className="nav-section-label">Mock Assessment</div>
-          <NavLink to="/mock-settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/mock-settings"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <Target />
             <span>Mock Test Qs Upload</span>
           </NavLink>
-          <NavLink to="/mock-results" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink
+            to="/mock-results"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
             <Award />
             <span>Mock Results</span>
           </NavLink>
@@ -113,7 +169,17 @@ export default function AdminLayout() {
       <div className="main-wrapper">
         {/* Top Navbar */}
         <header className="top-navbar">
-          <h1 className="top-title">{getPageTitle()}</h1>
+          <div className="top-left-group">
+            <button
+              type="button"
+              className="hamburger-btn"
+              onClick={() => setMobileNavOpen(prev => !prev)}
+              aria-label="Toggle navigation menu"
+            >
+              <Menu size={22} />
+            </button>
+            <h1 className="top-title">{getPageTitle()}</h1>
+          </div>
 
           <div className="top-right">
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -148,7 +214,7 @@ export default function AdminLayout() {
                 >
                   <User size={17} />
                 </div>
-                <div style={{ textAlign: 'left', lineHeight: '1.2' }}>
+                <div className="top-user-text" style={{ textAlign: 'left', lineHeight: '1.2' }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
                     {admin?.username || 'Admin'}
                   </div>
