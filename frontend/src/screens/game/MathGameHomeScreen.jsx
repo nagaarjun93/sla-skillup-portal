@@ -493,11 +493,6 @@ export default function MathGameHomeScreen({ navigation }) {
         </View>
       </TouchableOpacity>
 
-      {/* RESET DATA BUTTON */}
-      <TouchableOpacity style={styles.resetButton} onPress={handleReset} activeOpacity={0.7}>
-        <Text style={styles.resetButtonText}>🔄 Reset All Game Progress & Wallet</Text>
-      </TouchableOpacity>
-
       {/* Bottom Spacer for Tab Bar */}
       <View style={{ height: 90 }} />
 

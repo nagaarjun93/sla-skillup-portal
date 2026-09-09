@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
+import api from '../services/api';
 import { useUniversalRouter } from '../utils/useUniversalRouter';
 import Navbar from '../components/Navbar';
 import ScoreSummary from '../components/ScoreSummary';

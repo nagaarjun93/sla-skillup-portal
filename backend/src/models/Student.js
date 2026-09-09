@@ -77,7 +77,19 @@ const studentSchema = new mongoose.Schema({
   equippedFrame: {
     type: String,
     default: 'default'
-  }
+  },
+  gameHistory: [
+    {
+      gameType: { type: String, default: 'General' },
+      mode: { type: String, default: 'general' },
+      opponentName: { type: String, default: null },
+      opponentEmail: { type: String, default: null },
+      winnerName: { type: String, default: null },
+      coinsEarned: { type: Number, default: 0 },
+      playedAt: { type: Date, default: Date.now },
+      details: { type: String, default: '' }
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Student', studentSchema);

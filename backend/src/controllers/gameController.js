@@ -359,5 +359,149 @@ exports.equipFrame = async (req, res, next) => {
   }
 };
 
+// POST /api/student/game/lookup-student
+exports.lookupStudentByEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Please enter student email' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    if (cleanEmail === req.user.email?.toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot duel yourself! Please enter your opponent classmate email.'
+      });
+    }
+
+    const opponent = await Student.findOne({
+      email: cleanEmail,
+      status: 'ACTIVE'
+    }).select('name email courseName trainerName');
+
+    if (!opponent) {
+      return res.status(404).json({
+        success: false,
+        message: 'No registered SLA student found with this email. Make sure email is registered and active.'
+      });
+    }
+
+    res.json({
+      success: true,
+      student: {
+        id: opponent._id,
+        name: opponent.name,
+        email: opponent.email,
+        courseName: opponent.courseName || 'General Aptitude',
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/student/game/record-activity
+exports.recordGameActivity = async (req, res, next) => {
+  try {
+    const {
+      gameType = '2-Player Duel',
+      mode = 'general',
+      opponentName,
+      opponentEmail,
+      winnerName,
+      coinsEarned = 0,
+      details = ''
+    } = req.body;
+
+    const student = await Student.findById(req.user.id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const playedAt = new Date();
+    const newCoins = Number(coinsEarned) || 0;
+    if (newCoins > 0) {
+      student.gameCoins = (student.gameCoins ?? 200) + newCoins;
+    }
+
+    const currentRecord = {
+      gameType,
+      mode,
+      opponentName: opponentName || (mode === 'general' ? 'Guest Challenger' : 'Classmate'),
+      opponentEmail: opponentEmail || null,
+      winnerName: winnerName || 'Draw',
+      coinsEarned: newCoins,
+      playedAt,
+      details
+    };
+
+    if (!student.gameHistory) {
+      student.gameHistory = [];
+    }
+    student.gameHistory.unshift(currentRecord);
+    if (student.gameHistory.length > 25) {
+      student.gameHistory = student.gameHistory.slice(0, 25);
+    }
+    await student.save();
+
+    // If SLA Student Duel, also record match result into opponent's profile!
+    if (mode === 'sla_student' && opponentEmail) {
+      try {
+        const opponent = await Student.findOne({ email: opponentEmail.toLowerCase().trim() });
+        if (opponent) {
+          if (!opponent.gameHistory) {
+            opponent.gameHistory = [];
+          }
+          opponent.gameHistory.unshift({
+            gameType,
+            mode,
+            opponentName: student.name,
+            opponentEmail: student.email,
+            winnerName: winnerName || 'Draw',
+            coinsEarned: 0,
+            playedAt,
+            details
+          });
+          if (opponent.gameHistory.length > 25) {
+            opponent.gameHistory = opponent.gameHistory.slice(0, 25);
+          }
+          await opponent.save();
+        }
+      } catch (err) {
+        console.error('Error syncing opponent game history:', err);
+      }
+    }
+
+    res.json({
+      success: true,
+      totalCoins: student.gameCoins,
+      record: currentRecord,
+      history: student.gameHistory.slice(0, 10)
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/student/game/activity
+exports.getGameActivity = async (req, res, next) => {
+  try {
+    const student = await Student.findById(req.user.id).select('gameHistory gameCoins dailyStreak');
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    res.json({
+      success: true,
+      totalCoins: student.gameCoins ?? 200,
+      dailyStreak: student.dailyStreak || 1,
+      history: student.gameHistory || []
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 

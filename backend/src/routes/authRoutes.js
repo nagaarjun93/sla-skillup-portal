@@ -23,6 +23,9 @@ router.post('/student/game/award-coins', protect, gameController.awardCoins);
 router.get('/student/game/store-items', protect, gameController.getStoreItems);
 router.post('/student/game/purchase', protect, gameController.purchaseItem);
 router.post('/student/game/equip-frame', protect, gameController.equipFrame);
+router.post('/student/game/lookup-student', protect, gameController.lookupStudentByEmail);
+router.post('/student/game/record-activity', protect, gameController.recordGameActivity);
+router.get('/student/game/activity', protect, gameController.getGameActivity);
 
 module.exports = router;
 

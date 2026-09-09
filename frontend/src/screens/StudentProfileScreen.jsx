@@ -15,6 +15,7 @@ import { useArjunAuth } from '../context/AuthContext';
 import { useUniversalRouter } from '../utils/useUniversalRouter';
 import { authService } from '../services/authService';
 import { weeklyService } from '../services/weeklyService';
+import api from '../services/api';
 import { COLORS, SHADOWS } from '../styles/theme';
 
 export default function StudentProfileScreen() {
@@ -22,6 +23,7 @@ export default function StudentProfileScreen() {
   const { user, logout } = useArjunAuth();
   const [profileData, setProfileData] = useState(user);
   const [historyCount, setHistoryCount] = useState(0);
+  const [gameHistory, setGameHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -31,14 +33,27 @@ export default function StudentProfileScreen() {
 
   const fetchProfileAndStats = async () => {
     try {
-      // Fetch fresh profile from API to ensure mobile number is up to date
+      // Fetch fresh profile from API to ensure mobile number and game data are up to date
       try {
         const freshProfile = await authService.getStudentProfile();
         if (freshProfile) {
           setProfileData(freshProfile);
+          if (Array.isArray(freshProfile.gameHistory)) {
+            setGameHistory(freshProfile.gameHistory);
+          }
         }
       } catch (err) {
         // Fallback to AuthContext user
+      }
+
+      // Also try fetching dedicated game activity if available
+      try {
+        const actRes = await api.get('/student/game/activity');
+        if (actRes.data?.history) {
+          setGameHistory(actRes.data.history);
+        }
+      } catch (err) {
+        // Fallback
       }
 
       // Fetch completed tests count
@@ -48,6 +63,16 @@ export default function StudentProfileScreen() {
       // ignore
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatGameTime = (dateStr) => {
+    if (!dateStr) return 'Recently';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    } catch (e) {
+      return 'Recently';
     }
   };
 
@@ -149,6 +174,93 @@ export default function StudentProfileScreen() {
               <Text style={styles.metricLabel}>Game Coins</Text>
             </View>
           </View>
+
+          {/* Game Activity & Duel Records Section */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>🎮 Game Activity & Duel Records</Text>
+            <TouchableOpacity
+              onPress={() => router.push('math-game-home')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.playArenaLink}>Play Arena ➔</Text>
+            </TouchableOpacity>
+          </View>
+
+          {gameHistory.length > 0 ? (
+            <View style={styles.gameActivityCard}>
+              {/* Last Game Played Highlight */}
+              <View style={styles.lastGameHero}>
+                <View style={styles.lastGameTopRow}>
+                  <View style={styles.gameTypeBadge}>
+                    <Text style={styles.gameTypeBadgeText}>
+                      {gameHistory[0].gameType || '2-Player Duel'}
+                    </Text>
+                  </View>
+                  <Text style={styles.gameTimestamp}>
+                    🕒 {formatGameTime(gameHistory[0].playedAt)}
+                  </Text>
+                </View>
+
+                <View style={styles.lastGameMatchup}>
+                  <Text style={styles.matchupOpponent}>
+                    ⚔️ vs {gameHistory[0].opponentName || 'Guest Challenger'}
+                    {gameHistory[0].mode === 'sla_student' ? ' (SLA Classmate)' : ' (General)'}
+                  </Text>
+                  <View style={styles.winnerBadge}>
+                    <Text style={styles.winnerTextSmall}>
+                      🏆 Winner: {gameHistory[0].winnerName || 'N/A'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.lastGameCoinsRow}>
+                  <Text style={styles.coinsEarnedText}>
+                    🪙 Coins: <Text style={styles.coinsEarnedBold}>+{gameHistory[0].coinsEarned || 0}</Text>
+                  </Text>
+                  <Text style={styles.walletBalanceText}>
+                    Total: {(activeStudent?.gameCoins ?? 200).toLocaleString()} coins
+                  </Text>
+                </View>
+              </View>
+
+              {/* Previous games in history */}
+              {gameHistory.length > 1 && (
+                <View style={styles.historyListContainer}>
+                  <Text style={styles.previousMatchesTitle}>Recent Matches</Text>
+                  {gameHistory.slice(1, 4).map((item, idx) => (
+                    <View key={idx} style={styles.historyItemRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.historyItemTitle}>
+                          {item.gameType} • vs {item.opponentName || 'Challenger'}
+                        </Text>
+                        <Text style={styles.historyItemSub}>
+                          {formatGameTime(item.playedAt)} • Winner: {item.winnerName}
+                        </Text>
+                      </View>
+                      <Text style={styles.historyItemCoins}>
+                        +{item.coinsEarned || 0} 🪙
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.emptyGameCard}>
+              <Text style={{ fontSize: 26, marginBottom: 4 }}>🎮</Text>
+              <Text style={styles.emptyGameTitle}>No Duel Records Yet</Text>
+              <Text style={styles.emptyGameSub}>
+                Challenge a classmate in 2-Player Split Screen duel or play Speed Math Arena to record your first match!
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyPlayBtn}
+                onPress={() => router.push('math-game-home')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.emptyPlayBtnText}>Play Speed Math Arena 🚀</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Account Details Section */}
           <Text style={styles.sectionTitle}>Academic & Contact Info</Text>
@@ -418,5 +530,169 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  // Game Activity & Duel Records Styles
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 6,
+  },
+  playArenaLink: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  gameActivityCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    marginBottom: 16,
+    ...SHADOWS.small,
+  },
+  lastGameHero: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  lastGameTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  gameTypeBadge: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  gameTypeBadgeText: {
+    color: '#4338ca',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  gameTimestamp: {
+    fontSize: 11,
+    color: COLORS.gray500,
+    fontWeight: '600',
+  },
+  lastGameMatchup: {
+    marginBottom: 8,
+  },
+  matchupOpponent: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  winnerBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  winnerTextSmall: {
+    color: '#b45309',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  lastGameCoinsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  coinsEarnedText: {
+    fontSize: 12,
+    color: '#16a34a',
+    fontWeight: '600',
+  },
+  coinsEarnedBold: {
+    fontWeight: '800',
+  },
+  walletBalanceText: {
+    fontSize: 11.5,
+    color: COLORS.gray600,
+    fontWeight: '600',
+  },
+  historyListContainer: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray100,
+  },
+  previousMatchesTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: COLORS.gray500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  historyItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  historyItemTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  historyItemSub: {
+    fontSize: 10.5,
+    color: COLORS.gray500,
+    marginTop: 1,
+  },
+  historyItemCoins: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#16a34a',
+  },
+  emptyGameCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 18,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    marginBottom: 16,
+    ...SHADOWS.small,
+  },
+  emptyGameTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  emptyGameSub: {
+    fontSize: 11.5,
+    color: COLORS.gray600,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  emptyPlayBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  emptyPlayBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
