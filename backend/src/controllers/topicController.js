@@ -41,13 +41,26 @@ const ensureDefaultTopics = async () => {
       }
     }
 
-    // Also auto-incorporate any topics found in Question or WeeklyTest collections
+    // Remove any corrupted topics with high special character density or binary junk
+    await Topic.deleteMany({
+      $or: [
+        { name: { $regex: /[\!\@\#\$\%\^\&\*\(\)\_\+\<\>\?\:\;\'\`\~\\\/]{3,}/ } },
+        { name: { $regex: /SOC/i } },
+        { name: '&f' },
+        { name: { $regex: /^\+/ } }
+      ]
+    });
+
+    // Also auto-incorporate any valid topics found in Question or WeeklyTest collections
     const qTopics = await Question.distinct('topic');
     const wTopics = await WeeklyTest.distinct('topic');
     const existingTopics = new Set((await Topic.find().select('name')).map(t => t.name.toLowerCase()));
 
     const allDiscovered = [...new Set([...qTopics, ...wTopics])].filter(Boolean);
     for (const top of allDiscovered) {
+      if (/[\!\@\#\$\%\^\&\*\(\)\_\+\<\>\?\:\;\'\`\~\\\/]{4,}/.test(top) || top.length < 2 || top === '&f' || /^\+/.test(top)) {
+        continue;
+      }
       if (!existingTopics.has(top.trim().toLowerCase())) {
         const isReasoning = /reason|relation|puzzle|coding|syllogism|direction|series/i.test(top);
         await Topic.create({

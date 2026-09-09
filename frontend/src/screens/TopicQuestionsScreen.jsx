@@ -16,7 +16,7 @@ import { COLORS, SHADOWS } from '../styles/theme';
 
 export default function TopicQuestionsScreen() {
   const router = useUniversalRouter();
-  const { category, title } = router.params || {};
+  const { category, topic, title } = router.params || {};
 
   const [questions, setQuestions] = useState([]);
   const [showSolutionMap, setShowSolutionMap] = useState({});
@@ -31,7 +31,7 @@ export default function TopicQuestionsScreen() {
   const fetchDuration = async () => {
     try {
       const details = await examService.getCategoryDetails();
-      const match = (details || []).find(d => d.category === category || d.category === title);
+      const match = (details || []).find(d => d.category === category || d.category === title || d.name === title || d.name === topic);
       if (match && match.durationMinutes) {
         setDbDuration(match.durationMinutes);
       }
@@ -43,7 +43,13 @@ export default function TopicQuestionsScreen() {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      const res = await examService.getExamQuestions({ category, limit: 100 });
+      const res = await examService.getExamQuestions({
+        category: category || title,
+        topic: topic || title || category,
+        title: title || topic || category,
+        practice: 'true',
+        limit: 100,
+      });
       setQuestions(res.questions || []);
     } catch (e) {
       console.error(e);
@@ -64,6 +70,7 @@ export default function TopicQuestionsScreen() {
       pathname: '/exam',
       params: {
         category,
+        topic: topic || title || category,
         title: title || category,
         duration: dbDuration,
       },

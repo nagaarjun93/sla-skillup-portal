@@ -56,6 +56,7 @@ export default function CategorySelectScreen() {
       pathname: '/topic-questions',
       params: {
         category: categoryName,
+        topic: topicObj.name,
         title: topicObj.name,
       },
     });
@@ -64,11 +65,12 @@ export default function CategorySelectScreen() {
   // Start Timed Practice Exam for selected topic (Dynamic duration from DB)
   const handleStartTimedExam = (topicObj) => {
     const categoryName = topicObj.category || topicObj.name;
-    const dbInfo = dbCategories[categoryName];
+    const dbInfo = dbCategories[topicObj.name] || dbCategories[categoryName];
     router.push({
       pathname: '/exam',
       params: {
         category: categoryName,
+        topic: topicObj.name,
         title: topicObj.name,
         duration: dbInfo?.durationMinutes || 30,
       },
@@ -77,7 +79,7 @@ export default function CategorySelectScreen() {
 
   const renderTopicCard = (item) => {
     const categoryName = item.category || item.name;
-    const dbInfo = dbCategories[categoryName];
+    const dbInfo = dbCategories[item.name] || dbCategories[categoryName];
     const qCount = dbInfo ? dbInfo.totalQuestions : 0;
     const duration = dbInfo ? dbInfo.durationMinutes : 30;
 

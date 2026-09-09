@@ -63,7 +63,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 
 export default function ExamScreen() {
   const router = useUniversalRouter();
-  const { category, topic, weeklyTestId, duration = 30, isMock } = router.params || {};
+  const { category, topic, title, weeklyTestId, duration = 30, isMock } = router.params || {};
   const isMockExam = isMock === 'true' || isMock === true;
 
   const [questions, setQuestions] = useState([]);
@@ -110,9 +110,11 @@ export default function ExamScreen() {
       } else {
         // ── Regular Exam: fetch from normal question bank ──
         const res = await examService.getExamQuestions({
-          category,
-          topic,
+          category: category || title,
+          topic: topic || title || category,
+          title: title || topic || category,
           weeklyTestId,
+          limit: 100,
         });
         setQuestions(res.questions || []);
         if (res.durationMinutes) {

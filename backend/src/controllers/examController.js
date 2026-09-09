@@ -34,7 +34,17 @@ exports.getTopics = async (req, res, next) => {
 // GET /api/categories/details
 exports.getCategoryDetails = async (req, res, next) => {
   try {
-    const categories = await Question.distinct('category');
+    const qCategories = await Question.distinct('category');
+    const qTopics = await Question.distinct('topic');
+    let topicNames = [];
+    try {
+      topicNames = (await Topic.find().select('name category')).flatMap(t => [t.name, t.category]);
+    } catch (e) {}
+
+    const allDistinct = [...new Set([...qCategories, ...qTopics, ...topicNames])]
+      .filter(Boolean)
+      .filter(name => !/[\!\@\#\$\%\^\&\*\(\)\_\+\<\>\?\:\;\'\`\~\\\/]{4,}/.test(name) && name.length >= 2 && name !== '&f');
+
     const durations = await CategoryDuration.find();
     const durationMap = {};
     durations.forEach(d => {
@@ -42,12 +52,17 @@ exports.getCategoryDetails = async (req, res, next) => {
     });
 
     const categoryDetails = await Promise.all(
-      categories.map(async (cat) => {
-        const questionCount = await Question.countDocuments({ category: cat });
+      allDistinct.map(async (name) => {
+        const clean = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+        const regex = new RegExp(`^${clean}$`, 'i');
+        const questionCount = await Question.countDocuments({
+          $or: [{ category: regex }, { topic: regex }]
+        });
         return {
-          category: cat,
+          category: name,
+          name,
           totalQuestions: questionCount,
-          durationMinutes: durationMap[cat] || 30
+          durationMinutes: durationMap[name] || 30
         };
       })
     );
@@ -61,25 +76,49 @@ exports.getCategoryDetails = async (req, res, next) => {
 // GET /api/exam
 exports.getExamQuestions = async (req, res, next) => {
   try {
-    const { category, topic, weeklyTestId, limit = 50 } = req.query;
+    const { category, topic, title, weeklyTestId, limit = 100, practice } = req.query;
     const filter = {};
-    if (category) filter.category = category;
-    if (topic) filter.topic = topic;
     if (weeklyTestId) filter.weeklyTestId = weeklyTestId;
 
+    // Resolve target search subject/topic
+    const searchTarget = topic || title || (category && !['General', 'All Topics'].includes(category) ? category : null);
+
+    if (searchTarget && searchTarget !== 'General' && searchTarget !== 'All Topics') {
+      const clean = searchTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+      const regex = new RegExp(`^${clean}$`, 'i');
+      filter.$or = [
+        { topic: regex },
+        { category: regex }
+      ];
+    } else if (category && category !== 'General' && category !== 'All Topics') {
+      const cleanCat = category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+      filter.$or = [
+        { category: new RegExp(`^${cleanCat}$`, 'i') },
+        { topic: new RegExp(`^${cleanCat}$`, 'i') }
+      ];
+    }
+
     let durationMinutes = 30;
-    if (category) {
-      const catConfig = await CategoryDuration.findOne({ category });
+    if (searchTarget) {
+      const clean = searchTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+      const catConfig = await CategoryDuration.findOne({
+        category: new RegExp(`^${clean}$`, 'i')
+      });
       if (catConfig) durationMinutes = catConfig.durationMinutes;
     }
 
-    const questions = await Question.find(filter)
-      .select('-correctAnswer -explanation')
-      .limit(Number(limit));
+    let query = Question.find(filter).limit(Number(limit));
+    if (practice === 'true' || practice === true) {
+      // In practice mode (Paper & Pen practice), allow viewing answers and explanations
+    } else {
+      query = query.select('-correctAnswer -explanation');
+    }
+
+    const questions = await query;
 
     res.json({
-      category: category || 'General',
-      topic: topic || 'All Topics',
+      category: category || searchTarget || 'General',
+      topic: topic || searchTarget || 'All Topics',
       durationMinutes,
       totalQuestions: questions.length,
       questions
