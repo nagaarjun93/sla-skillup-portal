@@ -12,7 +12,6 @@ export default function MathGameResultScreen({ route, navigation }) {
   const {
     mode = 'level',
     levelNumber = 1,
-    score = 0,
     score: rawScore = 0,
     correctCount = 0,
     totalQuestions = 10,
@@ -66,7 +65,6 @@ export default function MathGameResultScreen({ route, navigation }) {
             </View>
             <View style={styles.divider} />
             <View style={styles.scoreItem}>
-              <Text style={[styles.scoreNumber, { color: '#2563eb' }]}>{score}</Text>
               <Text style={[styles.scoreNumber, { color: '#2563eb' }]}>{cleanScore}</Text>
               <Text style={styles.scoreSubLabel}>Total Points</Text>
             </View>

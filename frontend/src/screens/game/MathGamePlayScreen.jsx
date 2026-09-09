@@ -185,7 +185,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
         const res = await saveLevelResult(
           levelNumber,
           starsEarned,
-          finalScore,
           numericScore,
           finalCorrect,
           questions.length,
@@ -197,7 +196,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
         coinsEarned = res?.coinsEarned || 0;
         isBossDefeated = res?.isBossDefeated || false;
       } else if (mode === 'speed') {
-        const res = await saveSpeedChallengeResult(finalScore, finalCorrect, totalAnswered, finalMaxStreak);
         const res = await saveSpeedChallengeResult(numericScore, finalCorrect, totalAnswered, finalMaxStreak);
         coinsEarned = res?.coinsEarned || 0;
       }
@@ -205,7 +203,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
       navigation.replace('math-game-result', {
         mode,
         levelNumber,
-        score: finalScore,
         score: numericScore,
         correctCount: finalCorrect,
         wrongCount: finalWrong,
@@ -230,7 +227,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
 
     if (isSpeedMode) {
       // Entire 60s speed challenge finished!
-      finishGameRound(score, correctCount, wrongCount, maxStreak);
       finishGameRound(Number(score) || 0, correctCount, wrongCount, maxStreak);
     } else {
       // In level or practice mode: current question timed out!
@@ -250,7 +246,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
 
       const nextIndex = currentIndex + 1;
       if (nextIndex >= questions.length) {
-        finishGameRound(score, correctCount, nextWrong, maxStreak);
         finishGameRound(Number(score) || 0, correctCount, nextWrong, maxStreak);
       } else {
         advanceToNextQuestion(nextIndex);
@@ -302,7 +297,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
       setCorrectCount(nextCorrect);
 
       // Score calculation with speed bonus
-      const qScore = calculateQuestionScore(
       const qScoreObj = calculateQuestionScore(
         timeLeft,
         totalTimeForCurrent,
@@ -310,7 +304,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
         usedHint,
         currentQuestion.difficulty || 'medium'
       );
-      setScore((prev) => prev + qScore);
       const pointsAwarded = typeof qScoreObj === 'object' && qScoreObj !== null
         ? (Number(qScoreObj.pointsAwarded) || 0)
         : (Number(qScoreObj) || 0);
@@ -321,7 +314,6 @@ export default function MathGamePlayScreen({ route, navigation }) {
 
       const nextIndex = currentIndex + 1;
       if (!isSpeedMode && nextIndex >= questions.length) {
-        finishGameRound(score + qScore, nextCorrect, wrongCount, newMaxStreak);
         finishGameRound(newScore, nextCorrect, wrongCount, newMaxStreak);
       } else {
         advanceToNextQuestion(nextIndex);
@@ -344,13 +336,11 @@ export default function MathGamePlayScreen({ route, navigation }) {
       // In speed mode, give penalty of 20 points
       const updatedScore = isSpeedMode ? Math.max(0, currentNumericScore - 20) : currentNumericScore;
       if (isSpeedMode) {
-        setScore((prev) => Math.max(0, prev - 20));
         setScore(updatedScore);
       }
 
       const nextIndex = currentIndex + 1;
       if (!isSpeedMode && nextIndex >= questions.length) {
-        finishGameRound(score, correctCount, nextWrong, maxStreak);
         finishGameRound(updatedScore, correctCount, nextWrong, maxStreak);
       } else {
         advanceToNextQuestion(nextIndex);

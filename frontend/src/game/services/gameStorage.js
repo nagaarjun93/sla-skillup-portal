@@ -106,7 +106,6 @@ export async function loadUserStats() {
       await AsyncStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(DEFAULT_USER_STATS));
       return DEFAULT_USER_STATS;
     }
-    return { ...DEFAULT_USER_STATS, ...JSON.parse(raw) };
     const parsed = JSON.parse(raw) || {};
     return {
       ...DEFAULT_USER_STATS,
@@ -478,11 +477,9 @@ export async function saveLevelResult(
     };
 
     // Update level data
-    const oldStars = currentLevel.stars || 0;
     const numericScore = Math.max(0, Math.round(Number(score) || 0));
     const oldStars = Math.max(0, Math.round(Number(currentLevel.stars) || 0));
     const newStars = Math.max(oldStars, stars);
-    const newHighScore = Math.max(currentLevel.highScore || 0, score);
     const currentHighScore = Math.max(0, Math.round(Number(currentLevel.highScore) || 0));
     const newHighScore = Math.max(currentHighScore, numericScore);
     const starDelta = Math.max(0, newStars - oldStars);
@@ -536,11 +533,6 @@ export async function saveLevelResult(
     // Update lifetime stats
     const updatedStats = {
       ...stats,
-      totalScore: (stats.totalScore || 0) + score,
-      totalStars: (stats.totalStars || 0) + starDelta,
-      totalSolved: (stats.totalSolved || 0) + totalQuestions,
-      totalCorrect: (stats.totalCorrect || 0) + correctCount,
-      bestStreak: Math.max(stats.bestStreak || 0, maxStreak),
       totalScore: (Number(stats.totalScore) || 0) + numericScore,
       totalStars: (Number(stats.totalStars) || 0) + starDelta,
       totalSolved: (Number(stats.totalSolved) || 0) + totalQuestions,
@@ -556,7 +548,6 @@ export async function saveLevelResult(
       levels,
       stats: updatedStats,
       unlockedNext: stars >= 1 && levelNum < 50,
-      isNewHighScore: score > (currentLevel.highScore || 0),
       isNewHighScore: numericScore > currentHighScore,
       coinsEarned,
       isBossDefeated: isBoss && stars >= 1,
@@ -573,18 +564,12 @@ export async function saveLevelResult(
 export async function saveSpeedChallengeResult(score, correctCount, totalCount, maxStreak) {
   try {
     const stats = await loadUserStats();
-    const isNewHighScore = score > (stats.speedChallengeHighScore || 0);
     const numericScore = Math.max(0, Math.round(Number(score) || 0));
     const currentSpeedHighScore = Math.max(0, Math.round(Number(stats.speedChallengeHighScore) || 0));
     const isNewHighScore = numericScore > currentSpeedHighScore;
 
     const updatedStats = {
       ...stats,
-      totalScore: (stats.totalScore || 0) + score,
-      speedChallengeHighScore: Math.max(stats.speedChallengeHighScore || 0, score),
-      totalSolved: (stats.totalSolved || 0) + totalCount,
-      totalCorrect: (stats.totalCorrect || 0) + correctCount,
-      bestStreak: Math.max(stats.bestStreak || 0, maxStreak),
       totalScore: (Number(stats.totalScore) || 0) + numericScore,
       speedChallengeHighScore: Math.max(currentSpeedHighScore, numericScore),
       totalSolved: (Number(stats.totalSolved) || 0) + totalCount,
