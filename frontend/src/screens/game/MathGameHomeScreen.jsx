@@ -405,7 +405,7 @@ export default function MathGameHomeScreen({ navigation }) {
                 <Text style={[styles.bossFeatureText, { color: '#be185d' }]}>LOCAL 1v1</Text>
               </View>
             </View>
-            <Text style={styles.cardTagline}>Dual side-by-side battle on one phone! First to 10 wins</Text>
+            <Text style={styles.cardTagline}>Dual sprint battle on one phone! First to reach finish line wins 🏁</Text>
           </View>
         </View>
 

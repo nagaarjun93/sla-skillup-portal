@@ -260,9 +260,26 @@ export default function MathGameMultiplayerScreen({ navigation }) {
                 <Text style={styles.categoryTag}>{currentQuestion.category}</Text>
               )}
             </View>
-            <Text style={styles.scoreCounter}>
-              Score: <Text style={styles.scoreNum}>{p1Score}</Text> / {TARGET_SCORE}
-            </Text>
+            <View style={styles.speedGoalBadge}>
+              <Text style={styles.speedGoalText}>🏁 Reach Finish Line</Text>
+            </View>
+          </View>
+
+          {/* SPEED SPRINT LINE (Progress Track) */}
+          <View style={styles.sprintTrackContainer}>
+            <View style={styles.sprintTrackBackdrop}>
+              <View
+                style={[
+                  styles.sprintTrackFill,
+                  styles.p1TrackFill,
+                  { width: `${Math.min(100, Math.round((p1Score / TARGET_SCORE) * 100))}%` }
+                ]}
+              />
+            </View>
+            <View style={styles.sprintTrackMarkerRow}>
+              <Text style={styles.sprintMarkerText}>🏎️ START</Text>
+              <Text style={styles.sprintMarkerText}>FINISH 🏁</Text>
+            </View>
           </View>
 
           <View style={styles.questionBanner}>
@@ -295,9 +312,9 @@ export default function MathGameMultiplayerScreen({ navigation }) {
           <Text style={styles.centerExitText}>✕ Exit</Text>
         </TouchableOpacity>
 
-        <Text style={styles.centerScoreText}>
-          P1: {p1Score} | P2: {p2Score}
-        </Text>
+        <View style={styles.centerDuelStatus}>
+          <Text style={styles.centerDuelText}>⚡ SPEED SPRINT DUEL 🏁</Text>
+        </View>
 
         <TouchableOpacity
           style={styles.centerResetBtn}
@@ -320,9 +337,26 @@ export default function MathGameMultiplayerScreen({ navigation }) {
                 <Text style={styles.categoryTag}>{currentQuestion.category}</Text>
               )}
             </View>
-            <Text style={styles.scoreCounter}>
-              Score: <Text style={styles.scoreNum}>{p2Score}</Text> / {TARGET_SCORE}
-            </Text>
+            <View style={styles.speedGoalBadge}>
+              <Text style={styles.speedGoalText}>🏁 Reach Finish Line</Text>
+            </View>
+          </View>
+
+          {/* SPEED SPRINT LINE (Progress Track) */}
+          <View style={styles.sprintTrackContainer}>
+            <View style={styles.sprintTrackBackdrop}>
+              <View
+                style={[
+                  styles.sprintTrackFill,
+                  styles.p2TrackFill,
+                  { width: `${Math.min(100, Math.round((p2Score / TARGET_SCORE) * 100))}%` }
+                ]}
+              />
+            </View>
+            <View style={styles.sprintTrackMarkerRow}>
+              <Text style={styles.sprintMarkerText}>🚀 START</Text>
+              <Text style={styles.sprintMarkerText}>FINISH 🏁</Text>
+            </View>
           </View>
 
           <View style={styles.questionBanner}>
@@ -353,14 +387,14 @@ export default function MathGameMultiplayerScreen({ navigation }) {
             <Text style={styles.winnerText}>
               {winner === 'p1' ? 'PLAYER 1 WINS!' : 'PLAYER 2 WINS!'}
             </Text>
-            <Text style={styles.winnerSubText}>First to reach {TARGET_SCORE} points!</Text>
+            <Text style={styles.winnerSubText}>Reached the finish line first with lightning speed! ⚡🏁</Text>
 
             <TouchableOpacity
               style={styles.rematchBtn}
               onPress={handleRestart}
               activeOpacity={0.8}
             >
-              <Text style={styles.rematchText}>Rematch! ⚔️</Text>
+              <Text style={styles.rematchText}>Race Again! ⚔️</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -433,15 +467,54 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  scoreCounter: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#475569',
+  speedGoalBadge: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  scoreNum: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
+  speedGoalText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  sprintTrackContainer: {
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 8,
+  },
+  sprintTrackBackdrop: {
+    height: 10,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  sprintTrackFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  p1TrackFill: {
+    backgroundColor: '#ef4444',
+  },
+  p2TrackFill: {
+    backgroundColor: '#2563eb',
+  },
+  sprintTrackMarkerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    paddingHorizontal: 2,
+  },
+  sprintMarkerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.5,
   },
   questionBanner: {
     backgroundColor: '#ffffff',
@@ -506,10 +579,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  centerScoreText: {
+  centerDuelStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: '#334155',
+  },
+  centerDuelText: {
     color: '#f8fafc',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   centerResetBtn: {
     paddingVertical: 4,
