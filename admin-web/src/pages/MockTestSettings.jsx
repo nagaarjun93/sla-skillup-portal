@@ -22,6 +22,7 @@ export default function MockTestSettings() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewingModel, setViewingModel] = useState('Model 1');
   const [viewingQuestions, setViewingQuestions] = useState([]);
+  const [availableModels, setAvailableModels] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -32,9 +33,10 @@ export default function MockTestSettings() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [settingsRes, statsRes] = await Promise.all([
+      const [settingsRes, statsRes, modelsRes] = await Promise.all([
         api.get('/admin/mock/settings'),
-        api.get('/admin/mock/models-stats')
+        api.get('/admin/mock/models-stats'),
+        api.get('/admin/mock/models').catch(() => ({ data: [] }))
       ]);
       if (settingsRes.data) {
         setSettings({
@@ -43,6 +45,11 @@ export default function MockTestSettings() {
         });
       }
       setModelStats(statsRes.data || []);
+      if (Array.isArray(modelsRes?.data) && modelsRes.data.length > 0) {
+        setAvailableModels(modelsRes.data);
+      } else if (statsRes.data && statsRes.data.length > 0) {
+        setAvailableModels(statsRes.data.map(s => s.modelSet));
+      }
     } catch (e) {
       console.error('Failed to load mock settings/stats:', e);
     } finally {
@@ -472,14 +479,14 @@ export default function MockTestSettings() {
 
           <form onSubmit={handleUploadMockCsv}>
             <div className="form-group">
-              <label className="form-label">Target Model Set (Model 1 to 10)</label>
+              <label className="form-label">Target Model Set (From DB)</label>
               <select
                 className="form-select"
                 value={selectedTargetModel}
                 onChange={e => setSelectedTargetModel(e.target.value)}
               >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                  <option key={n} value={`Model ${n}`}>Model {n}</option>
+                {(availableModels.length > 0 ? availableModels : (modelStats.length > 0 ? modelStats.map(m => m.modelSet) : ['Model 1'])).map(modelName => (
+                  <option key={modelName} value={modelName}>{modelName}</option>
                 ))}
               </select>
             </div>

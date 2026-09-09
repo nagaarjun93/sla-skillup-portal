@@ -13,6 +13,7 @@ import {
 
 export default function StudentManagement() {
   const [students, setStudents] = useState([]);
+  const [availableModels, setAvailableModels] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [bulkMockEligible, setBulkMockEligible] = useState(false);
@@ -25,9 +26,16 @@ export default function StudentManagement() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/students/management');
+      const [res, modelsRes] = await Promise.all([
+        api.get('/admin/students/management'),
+        api.get('/admin/mock/models').catch(() => ({ data: [] }))
+      ]);
       const list = res.data || [];
       setStudents(list);
+
+      if (Array.isArray(modelsRes?.data) && modelsRes.data.length > 0) {
+        setAvailableModels(modelsRes.data);
+      }
 
       const allAllowed = list.length > 0 && list.every(s => s.mockTestAllowed || s.mockTestAccess);
       setBulkMockEligible(allAllowed);
@@ -83,7 +91,7 @@ export default function StudentManagement() {
   };
 
   const handleAutoDistributeModels = async () => {
-    if (!window.confirm('Auto-distribute 10 Mock Models evenly across all active students?')) return;
+    if (!window.confirm('Auto-distribute available Mock Models evenly across all active students?')) return;
     setProcessing(true);
     try {
       const res = await api.post('/admin/mock/auto-distribute-models');
@@ -238,8 +246,11 @@ export default function StudentManagement() {
                         value={student.assignedMockModel || 'Model 1'}
                         onChange={e => handleModelChange(student._id, e.target.value)}
                       >
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                          <option key={n} value={`Model ${n}`}>Model {n}</option>
+                        {Array.from(new Set([
+                          ...(availableModels.length > 0 ? availableModels : ['Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5']),
+                          student.assignedMockModel
+                        ].filter(Boolean))).map(m => (
+                          <option key={m} value={m}>{m}</option>
                         ))}
                       </select>
                     </td>

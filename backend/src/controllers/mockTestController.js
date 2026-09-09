@@ -128,7 +128,10 @@ exports.autoDistributeMockModels = async (req, res, next) => {
     if (!students || students.length === 0) {
       return res.status(400).json({ message: 'No active students found' });
     }
-    const models = ['Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5', 'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'];
+    const existingModels = await MockQuestion.distinct('modelSet');
+    const models = (existingModels && existingModels.length > 0)
+      ? existingModels.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      : ['Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5', 'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'];
     const bulkOps = students.map((st, idx) => ({
       updateOne: {
         filter: { _id: st._id },
@@ -136,7 +139,7 @@ exports.autoDistributeMockModels = async (req, res, next) => {
       }
     }));
     await Student.bulkWrite(bulkOps);
-    res.json({ message: `Auto-distributed 10 Mock Models across ${students.length} students successfully!` });
+    res.json({ message: `Auto-distributed ${models.length} Mock Models across ${students.length} students successfully!` });
   } catch (error) {
     next(error);
   }
@@ -145,7 +148,12 @@ exports.autoDistributeMockModels = async (req, res, next) => {
 // GET /api/admin/mock/models-stats
 exports.getMockModelsStats = async (req, res, next) => {
   try {
-    const models = ['Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5', 'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'];
+    const existingModels = await MockQuestion.distinct('modelSet');
+    const studentAssigned = await Student.distinct('assignedMockModel');
+    const allSet = [...new Set([...existingModels, ...studentAssigned])].filter(Boolean);
+    const models = allSet.length > 0
+      ? allSet.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      : ['Model 1', 'Model 2', 'Model 3', 'Model 4', 'Model 5', 'Model 6', 'Model 7', 'Model 8', 'Model 9', 'Model 10'];
     const stats = await Promise.all(models.map(async (m) => {
       const qCount = await MockQuestion.countDocuments({ modelSet: m });
       const sCount = await Student.countDocuments({ assignedMockModel: m });
