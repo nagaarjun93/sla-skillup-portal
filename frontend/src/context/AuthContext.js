@@ -16,6 +16,15 @@ export const AuthProvider = ({ children }) => {
 
   const loadStoredAuth = async () => {
     try {
+      const storedToken = await getSecureItem('arjun_auth_token');
+      const storedUser = await getSecureItem('arjun_auth_user');
+      const storedRole = await getSecureItem('arjun_auth_role');
+
+      if (storedToken && storedUser && storedRole) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+        setRole(storedRole);
+      }
       // Require fresh login on each app launch:
       // Always reset persistent session on initial load so login is prompted on every app start
       await removeSecureItem('arjun_auth_token');
@@ -25,6 +34,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setRole(null);
     } catch (e) {
+      console.error('Error loading stored auth:', e);
       console.error('Error resetting stored auth on app launch:', e);
     } finally {
       setLoading(false);

@@ -139,6 +139,7 @@ const QUESTION_GENERATORS = [
 ];
 
 export default function MathGameMultiplayerScreen({ navigation }) {
+  const TARGET_SCORE = 10;
   const TARGET_SCORE = 6;
   const { user } = useArjunAuth();
 

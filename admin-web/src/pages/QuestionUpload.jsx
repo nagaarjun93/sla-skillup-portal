@@ -164,6 +164,50 @@ export default function QuestionUpload() {
     }
   };
 
+  const splitCsvRow = (text) => {
+    const res = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '"') {
+        if (inQuotes && text[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        res.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    res.push(current.trim());
+    return res;
+  };
+
+  const sanitizeAnswer = (val, optA, optB, optC, optD) => {
+    if (!val) return 'A';
+    const raw = String(val).trim().toUpperCase();
+    if (['A', 'B', 'C', 'D'].includes(raw)) return raw;
+    if (raw.startsWith('OPTION')) {
+      const last = raw.replace('OPTION', '').trim();
+      if (['A', 'B', 'C', 'D'].includes(last)) return last;
+    }
+    if (raw === '1') return 'A';
+    if (raw === '2') return 'B';
+    if (raw === '3') return 'C';
+    if (raw === '4') return 'D';
+    const rawLower = String(val).trim().toLowerCase();
+    if (optA && rawLower === String(optA).trim().toLowerCase()) return 'A';
+    if (optB && rawLower === String(optB).trim().toLowerCase()) return 'B';
+    if (optC && rawLower === String(optC).trim().toLowerCase()) return 'C';
+    if (optD && rawLower === String(optD).trim().toLowerCase()) return 'D';
+    return 'A';
+  };
+
   const parseCsvLinesToQuestions = (text, fallbackCategory, fallbackTopic, targetWeeklyId) => {
     const rawLines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
     if (rawLines.length === 0) return [];
