@@ -13,12 +13,21 @@ export default function MathGameResultScreen({ route, navigation }) {
     mode = 'level',
     levelNumber = 1,
     score = 0,
+    score: rawScore = 0,
     correctCount = 0,
     totalQuestions = 10,
     unlockedNext = false,
     coinsEarned = 0,
     mistakesList = [],
   } = route.params || {};
+
+  const cleanScore = typeof rawScore === 'number'
+    ? (isNaN(rawScore) ? 0 : rawScore)
+    : (rawScore && typeof rawScore === 'object' && rawScore.pointsAwarded !== undefined
+      ? (Number(rawScore.pointsAwarded) || 0)
+      : (typeof rawScore === 'string' && rawScore.includes('[object')
+        ? correctCount * 100
+        : (Number(rawScore) || 0)));
 
   const handleNextLevel = () => {
     navigation.replace('math-game-play', {
@@ -58,6 +67,7 @@ export default function MathGameResultScreen({ route, navigation }) {
             <View style={styles.divider} />
             <View style={styles.scoreItem}>
               <Text style={[styles.scoreNumber, { color: '#2563eb' }]}>{score}</Text>
+              <Text style={[styles.scoreNumber, { color: '#2563eb' }]}>{cleanScore}</Text>
               <Text style={styles.scoreSubLabel}>Total Points</Text>
             </View>
           </View>

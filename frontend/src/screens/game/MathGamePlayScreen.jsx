@@ -172,6 +172,8 @@ export default function MathGamePlayScreen({ route, navigation }) {
       isFinishedRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
 
+      const numericScore = Math.max(0, Math.round(Number(finalScore) || 0));
+
       let starsEarned = 0;
       let unlockedNext = false;
       let coinsEarned = 0;
@@ -184,6 +186,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
           levelNumber,
           starsEarned,
           finalScore,
+          numericScore,
           finalCorrect,
           questions.length,
           finalMaxStreak,
@@ -195,6 +198,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
         isBossDefeated = res?.isBossDefeated || false;
       } else if (mode === 'speed') {
         const res = await saveSpeedChallengeResult(finalScore, finalCorrect, totalAnswered, finalMaxStreak);
+        const res = await saveSpeedChallengeResult(numericScore, finalCorrect, totalAnswered, finalMaxStreak);
         coinsEarned = res?.coinsEarned || 0;
       }
 
@@ -202,6 +206,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
         mode,
         levelNumber,
         score: finalScore,
+        score: numericScore,
         correctCount: finalCorrect,
         wrongCount: finalWrong,
         totalQuestions: mode === 'level' ? questions.length : totalAnswered,
@@ -226,6 +231,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
     if (isSpeedMode) {
       // Entire 60s speed challenge finished!
       finishGameRound(score, correctCount, wrongCount, maxStreak);
+      finishGameRound(Number(score) || 0, correctCount, wrongCount, maxStreak);
     } else {
       // In level or practice mode: current question timed out!
       if (currentQuestion) {
@@ -245,6 +251,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
       const nextIndex = currentIndex + 1;
       if (nextIndex >= questions.length) {
         finishGameRound(score, correctCount, nextWrong, maxStreak);
+        finishGameRound(Number(score) || 0, correctCount, nextWrong, maxStreak);
       } else {
         advanceToNextQuestion(nextIndex);
       }
@@ -296,6 +303,7 @@ export default function MathGamePlayScreen({ route, navigation }) {
 
       // Score calculation with speed bonus
       const qScore = calculateQuestionScore(
+      const qScoreObj = calculateQuestionScore(
         timeLeft,
         totalTimeForCurrent,
         nextStreak,
@@ -303,10 +311,18 @@ export default function MathGamePlayScreen({ route, navigation }) {
         currentQuestion.difficulty || 'medium'
       );
       setScore((prev) => prev + qScore);
+      const pointsAwarded = typeof qScoreObj === 'object' && qScoreObj !== null
+        ? (Number(qScoreObj.pointsAwarded) || 0)
+        : (Number(qScoreObj) || 0);
+
+      const currentNumericScore = Number(score) || 0;
+      const newScore = currentNumericScore + pointsAwarded;
+      setScore(newScore);
 
       const nextIndex = currentIndex + 1;
       if (!isSpeedMode && nextIndex >= questions.length) {
         finishGameRound(score + qScore, nextCorrect, wrongCount, newMaxStreak);
+        finishGameRound(newScore, nextCorrect, wrongCount, newMaxStreak);
       } else {
         advanceToNextQuestion(nextIndex);
       }
@@ -324,14 +340,18 @@ export default function MathGamePlayScreen({ route, navigation }) {
       const nextWrong = wrongCount + 1;
       setWrongCount(nextWrong);
 
+      const currentNumericScore = Number(score) || 0;
       // In speed mode, give penalty of 20 points
+      const updatedScore = isSpeedMode ? Math.max(0, currentNumericScore - 20) : currentNumericScore;
       if (isSpeedMode) {
         setScore((prev) => Math.max(0, prev - 20));
+        setScore(updatedScore);
       }
 
       const nextIndex = currentIndex + 1;
       if (!isSpeedMode && nextIndex >= questions.length) {
         finishGameRound(score, correctCount, nextWrong, maxStreak);
+        finishGameRound(updatedScore, correctCount, nextWrong, maxStreak);
       } else {
         advanceToNextQuestion(nextIndex);
       }

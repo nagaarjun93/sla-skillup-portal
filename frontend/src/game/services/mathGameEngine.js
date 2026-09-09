@@ -113,6 +113,8 @@ export function calculateQuestionScore(
     pointsAwarded: total,
     speedBonus,
     multiplier,
+    valueOf() { return total; },
+    toString() { return String(total); },
   };
 }
 

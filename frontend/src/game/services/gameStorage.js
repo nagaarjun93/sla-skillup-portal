@@ -81,6 +81,14 @@ export async function loadLevelsProgress() {
     }
     const parsed = JSON.parse(raw);
     const merged = { ...def, ...parsed };
+    // Defensively sanitize any corrupted strings or objects
+    for (const key of Object.keys(merged)) {
+      if (merged[key]) {
+        merged[key].highScore = Math.max(0, Math.round(Number(merged[key].highScore) || 0));
+        merged[key].stars = Math.max(0, Math.min(3, Math.round(Number(merged[key].stars) || 0)));
+        merged[key].playedCount = Math.max(0, Math.round(Number(merged[key].playedCount) || 0));
+      }
+    }
     return merged;
   } catch (error) {
     console.error('Error loading levels progress:', error);
@@ -99,6 +107,18 @@ export async function loadUserStats() {
       return DEFAULT_USER_STATS;
     }
     return { ...DEFAULT_USER_STATS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) || {};
+    return {
+      ...DEFAULT_USER_STATS,
+      ...parsed,
+      totalScore: Math.max(0, Math.round(Number(parsed.totalScore) || 0)),
+      totalStars: Math.max(0, Math.round(Number(parsed.totalStars) || 0)),
+      totalSolved: Math.max(0, Math.round(Number(parsed.totalSolved) || 0)),
+      totalCorrect: Math.max(0, Math.round(Number(parsed.totalCorrect) || 0)),
+      bestStreak: Math.max(0, Math.round(Number(parsed.bestStreak) || 0)),
+      speedChallengeHighScore: Math.max(0, Math.round(Number(parsed.speedChallengeHighScore) || 0)),
+      levelsCompleted: Math.max(0, Math.round(Number(parsed.levelsCompleted) || 0)),
+    };
   } catch (error) {
     console.error('Error loading user stats:', error);
     return DEFAULT_USER_STATS;
@@ -459,8 +479,12 @@ export async function saveLevelResult(
 
     // Update level data
     const oldStars = currentLevel.stars || 0;
+    const numericScore = Math.max(0, Math.round(Number(score) || 0));
+    const oldStars = Math.max(0, Math.round(Number(currentLevel.stars) || 0));
     const newStars = Math.max(oldStars, stars);
     const newHighScore = Math.max(currentLevel.highScore || 0, score);
+    const currentHighScore = Math.max(0, Math.round(Number(currentLevel.highScore) || 0));
+    const newHighScore = Math.max(currentHighScore, numericScore);
     const starDelta = Math.max(0, newStars - oldStars);
 
     levels[levelNum] = {
@@ -517,6 +541,11 @@ export async function saveLevelResult(
       totalSolved: (stats.totalSolved || 0) + totalQuestions,
       totalCorrect: (stats.totalCorrect || 0) + correctCount,
       bestStreak: Math.max(stats.bestStreak || 0, maxStreak),
+      totalScore: (Number(stats.totalScore) || 0) + numericScore,
+      totalStars: (Number(stats.totalStars) || 0) + starDelta,
+      totalSolved: (Number(stats.totalSolved) || 0) + totalQuestions,
+      totalCorrect: (Number(stats.totalCorrect) || 0) + correctCount,
+      bestStreak: Math.max(Number(stats.bestStreak) || 0, maxStreak),
       levelsCompleted: completedCount,
     };
 
@@ -528,6 +557,7 @@ export async function saveLevelResult(
       stats: updatedStats,
       unlockedNext: stars >= 1 && levelNum < 50,
       isNewHighScore: score > (currentLevel.highScore || 0),
+      isNewHighScore: numericScore > currentHighScore,
       coinsEarned,
       isBossDefeated: isBoss && stars >= 1,
     };
@@ -544,6 +574,9 @@ export async function saveSpeedChallengeResult(score, correctCount, totalCount, 
   try {
     const stats = await loadUserStats();
     const isNewHighScore = score > (stats.speedChallengeHighScore || 0);
+    const numericScore = Math.max(0, Math.round(Number(score) || 0));
+    const currentSpeedHighScore = Math.max(0, Math.round(Number(stats.speedChallengeHighScore) || 0));
+    const isNewHighScore = numericScore > currentSpeedHighScore;
 
     const updatedStats = {
       ...stats,
@@ -552,6 +585,11 @@ export async function saveSpeedChallengeResult(score, correctCount, totalCount, 
       totalSolved: (stats.totalSolved || 0) + totalCount,
       totalCorrect: (stats.totalCorrect || 0) + correctCount,
       bestStreak: Math.max(stats.bestStreak || 0, maxStreak),
+      totalScore: (Number(stats.totalScore) || 0) + numericScore,
+      speedChallengeHighScore: Math.max(currentSpeedHighScore, numericScore),
+      totalSolved: (Number(stats.totalSolved) || 0) + totalCount,
+      totalCorrect: (Number(stats.totalCorrect) || 0) + correctCount,
+      bestStreak: Math.max(Number(stats.bestStreak) || 0, maxStreak),
     };
 
     // Coins based on score (1 coin per 25 points, minimum 10 if score > 0)
