@@ -92,33 +92,75 @@ export default function QuestionUpload() {
     }
   };
 
+  const fileInputRef = React.useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [filePreviewInfo, setFilePreviewInfo] = useState(null);
 
-  const handleFileChange = async (e) => {
-    const selected = e.target.files[0];
-    if (selected) {
-      if (!selected.name.endsWith('.csv') && !selected.name.endsWith('.txt')) {
-        setError('Please select a valid CSV or TXT spreadsheet file');
-        setFile(null);
-        setFilePreviewInfo(null);
-        return;
-      }
-      setFile(selected);
-      setError('');
-      setResult(null);
+  const getFileTypeLabel = (filename) => {
+    if (!filename) return 'Document';
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'pdf': return 'PDF Document';
+      case 'docx':
+      case 'doc': return 'Word Document';
+      case 'xlsx':
+      case 'xls': return 'Excel Spreadsheet';
+      case 'csv': return 'CSV File';
+      case 'txt': return 'Text File';
+      default: return 'Document';
+    }
+  };
 
-      // Read preview of rows
+  const processSelectedFile = async (selected) => {
+    if (!selected) return;
+    const lowerName = selected.name.toLowerCase();
+    const validExts = ['.csv', '.txt', '.pdf', '.docx', '.doc', '.xlsx', '.xls'];
+    const isValid = validExts.some(ext => lowerName.endsWith(ext));
+
+    if (!isValid) {
+      setError('Please select a supported question file: .csv, .xlsx, .xls, .pdf, .docx, .doc, .txt');
+      setFile(null);
+      setFilePreviewInfo(null);
+      return;
+    }
+
+    setFile(selected);
+    setError('');
+    setResult(null);
+
+    const sizeFormatted = selected.size > 1024 * 1024
+      ? `${(selected.size / (1024 * 1024)).toFixed(2)} MB`
+      : `${Math.round(selected.size / 1024)} KB`;
+
+    const fileType = getFileTypeLabel(selected.name);
+
+    if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt')) {
       try {
         const text = await selected.text();
         const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
         const rowCount = Math.max(0, lines.length - 1);
         setFilePreviewInfo({
           fileName: selected.name,
+          size: sizeFormatted,
+          type: fileType,
           detectedRows: rowCount > 0 ? rowCount : lines.length
         });
       } catch (err) {
-        setFilePreviewInfo({ fileName: selected.name, detectedRows: 'Ready' });
+        setFilePreviewInfo({ fileName: selected.name, size: sizeFormatted, type: fileType, detectedRows: 'Ready' });
       }
+    } else {
+      setFilePreviewInfo({
+        fileName: selected.name,
+        size: sizeFormatted,
+        type: fileType,
+        detectedRows: 'Ready for auto-extraction'
+      });
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      processSelectedFile(e.target.files[0]);
     }
   };
 
@@ -228,57 +270,63 @@ export default function QuestionUpload() {
 
     if (inputMode === 'file') {
       if (!file) {
-        setError('Please select a CSV file first');
+        setError('Please select a question file first (.csv, .xlsx, .pdf, .docx, .txt)');
         return;
       }
 
       setUploading(true);
+      const isTextOrCsv = file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.txt');
 
       try {
-        // Read file text directly in browser for 100% reliable parsing & bulk insert
-        const fileContent = await file.text();
-        const parsedQuestions = parseCsvLinesToQuestions(
-          fileContent,
-          targetCategory,
-          targetTopic,
-          selectedWeeklyTestId || null
-        );
+        if (isTextOrCsv) {
+          // Read file text directly in browser for fast client-side parsing
+          const fileContent = await file.text();
+          const parsedQuestions = parseCsvLinesToQuestions(
+            fileContent,
+            targetCategory,
+            targetTopic,
+            selectedWeeklyTestId || null
+          );
 
-        if (parsedQuestions.length === 0) {
-          // Fallback to FormData upload endpoint if client parse had 0 rows
-          const formData = new FormData();
-          formData.append('file', file);
-          if (selectedWeeklyTestId) {
-            formData.append('weeklyTestId', selectedWeeklyTestId);
+          if (parsedQuestions.length > 0) {
+            // Save directly via save-bulk
+            const res = await api.post('/admin/questions/save-bulk', {
+              questions: parsedQuestions,
+              weeklyTestId: selectedWeeklyTestId || null,
+              category: targetCategory,
+              topic: targetTopic
+            });
+
+            setResult({
+              message: `Successfully uploaded and saved ${parsedQuestions.length} questions from ${file.name} into Database! 🎉`,
+              inserted: parsedQuestions
+            });
+            setFile(null);
+            setFilePreviewInfo(null);
+            fetchWeeklyTests();
+            return;
           }
-          formData.append('category', targetCategory);
-          formData.append('topic', targetTopic);
-
-          const res = await api.post('/admin/questions/upload-csv', formData);
-          setResult(res.data);
-          setFile(null);
-          setFilePreviewInfo(null);
-          fetchWeeklyTests();
-          return;
         }
 
-        // Save directly via save-bulk
-        const res = await api.post('/admin/questions/save-bulk', {
-          questions: parsedQuestions,
-          weeklyTestId: selectedWeeklyTestId || null,
-          category: targetCategory,
-          topic: targetTopic
-        });
+        // For .pdf, .docx, .xlsx, .xls or if client parse needed server extraction:
+        const formData = new FormData();
+        formData.append('file', file);
+        if (selectedWeeklyTestId) {
+          formData.append('weeklyTestId', selectedWeeklyTestId);
+        }
+        formData.append('category', targetCategory);
+        formData.append('topic', targetTopic);
 
+        const res = await api.post('/admin/questions/upload-csv', formData);
         setResult({
-          message: `Successfully uploaded and saved ${parsedQuestions.length} questions into Database! 🎉`,
-          inserted: parsedQuestions
+          message: res.data.message || `Successfully extracted and uploaded questions from ${file.name}! 🎉`,
+          inserted: res.data.inserted || res.data.count
         });
         setFile(null);
         setFilePreviewInfo(null);
         fetchWeeklyTests();
       } catch (err) {
-        setError(err.response?.data?.message || err.message || 'Failed to upload and parse CSV questions');
+        setError(err.response?.data?.message || err.message || 'Failed to upload and extract questions from file');
       } finally {
         setUploading(false);
       }
@@ -465,11 +513,14 @@ export default function QuestionUpload() {
           <button
             type="button"
             className={`btn ${inputMode === 'file' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setInputMode('file')}
+            onClick={() => {
+              setInputMode('file');
+              setTimeout(() => fileInputRef.current?.click(), 50);
+            }}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '8px 16px' }}
           >
             <UploadCloud size={16} />
-            <span>Pick / Drop CSV File</span>
+            <span>Pick / Drop Question File</span>
           </button>
           <button
             type="button"
@@ -527,32 +578,112 @@ export default function QuestionUpload() {
 
         <form onSubmit={handleUpload}>
           {inputMode === 'file' ? (
-            <div
-              style={{
-                border: '2px dashed #cbd5e1',
-                borderRadius: '12px',
-                padding: '40px 20px',
-                textAlign: 'center',
-                backgroundColor: '#f8fafc',
-                cursor: 'pointer',
-                marginBottom: '20px',
-              }}
-              onClick={() => document.getElementById('csvFileInput').click()}
-            >
-              <UploadCloud size={48} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
-              <div style={{ fontWeight: '700', fontSize: '15px', color: '#1e293b', marginBottom: '4px' }}>
-                {file ? file.name : 'Click to select or drag CSV spreadsheet here'}
+            <div style={{ marginBottom: '20px' }}>
+              <div
+                style={{
+                  border: isDragging ? '2px dashed #2563eb' : '2px dashed #94a3b8',
+                  borderRadius: '12px',
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  backgroundColor: isDragging ? '#eff6ff' : '#f8fafc',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isDragging ? '0 0 0 4px rgba(37, 99, 235, 0.15)' : 'none',
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    processSelectedFile(e.dataTransfer.files[0]);
+                  }
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.txt,.pdf,.docx,.doc,.xlsx,.xls"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+
+                {file ? (
+                  <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #bfdbfe',
+                      padding: '12px 20px',
+                      borderRadius: '10px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                    }}>
+                      <div style={{ padding: '10px', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                        <UploadCloud size={24} />
+                      </div>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a' }}>{file.name}</div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          <span style={{ fontWeight: '700', color: '#2563eb' }}>{filePreviewInfo?.type || 'Document'}</span> • {filePreviewInfo?.size || ''} {filePreviewInfo?.detectedRows ? `• ~${filePreviewInfo.detectedRows} items` : ''}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFile(null);
+                          setFilePreviewInfo(null);
+                        }}
+                        style={{
+                          marginLeft: '12px',
+                          border: 'none',
+                          background: '#f1f5f9',
+                          borderRadius: '50%',
+                          width: '28px',
+                          height: '28px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: '#64748b'
+                        }}
+                        title="Remove file"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#16a34a', fontWeight: '700' }}>
+                      ✅ Ready! Click "Upload & Save Questions" below or click box to replace file.
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <UploadCloud size={44} color={isDragging ? '#2563eb' : '#94a3b8'} style={{ margin: '0 auto 10px' }} />
+                    <div style={{ fontWeight: '800', fontSize: '15px', color: '#1e293b', marginBottom: '6px' }}>
+                      Click to open file picker or Drag & Drop question file here
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '12px' }}>
+                      Supports all formats: <strong>CSV, Excel (.xlsx, .xls), PDF (.pdf), Word (.docx, .doc), Text (.txt)</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span className="badge" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📄 PDF</span>
+                      <span className="badge" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📝 Word (.docx)</span>
+                      <span className="badge" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📊 Excel (.xlsx)</span>
+                      <span className="badge" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📋 CSV Spreadsheet</span>
+                      <span className="badge" style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>📃 Text</span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>
-                Supported formats: .csv, .txt (comma separated)
-              </div>
-              <input
-                id="csvFileInput"
-                type="file"
-                accept=".csv,.txt"
-                style={{ display: 'none' }}
-                onChange={handleFileChange}
-              />
             </div>
           ) : (
             <div style={{ marginBottom: '20px' }}>

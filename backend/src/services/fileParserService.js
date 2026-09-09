@@ -1,5 +1,9 @@
 const { parse } = require('csv-parse/sync');
 const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
+const mammoth = require('mammoth');
+const pdfParse = require('pdf-parse');
 
 const sanitizeKey = (k) => {
   if (!k) return '';
@@ -33,70 +37,25 @@ const sanitizeAnswer = (ans, optA, optB, optC, optD) => {
   return 'A';
 };
 
-const parseCsvString = (content) => {
-  if (!content || !content.trim()) return [];
+/**
+ * ENGINE 1: Tabular / 2D Rows Parser
+ * Parses 2D array of cells (from CSV or Excel Sheet)
+ */
+const parseRowsToQuestions = (rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
 
-  // Remove potential BOM
-  let cleanContent = content.replace(/^\uFEFF/, '');
+  // Filter out completely empty rows
+  const cleanRows = rows.filter(r => Array.isArray(r) && r.some(c => c !== null && c !== undefined && String(c).trim().length > 0));
+  if (cleanRows.length === 0) return [];
 
-  // Auto-detect delimiter from the first few lines
-  const firstLines = cleanContent.split(/\r?\n/).slice(0, 5).join('\n');
-  const commaCount = (firstLines.match(/,/g) || []).length;
-  const semiCount = (firstLines.match(/;/g) || []).length;
-  const tabCount = (firstLines.match(/\t/g) || []).length;
-
-  let delimiter = ',';
-  if (semiCount > commaCount && semiCount > tabCount) {
-    delimiter = ';';
-  } else if (tabCount > commaCount && tabCount > semiCount) {
-    delimiter = '\t';
-  }
-
-  let rows = [];
-  try {
-    rows = parse(cleanContent, {
-      delimiter,
-      bom: true,
-      skip_empty_lines: true,
-      trim: true,
-      relax_column_count: true,
-      relax_quotes: true
-    });
-  } catch (err) {
-    // Fallback parser: line-by-line quote-aware split
-    const lines = cleanContent.split(/\r?\n/).filter(l => l.trim().length > 0);
-    rows = lines.map(line => {
-      const parts = [];
-      let cur = '';
-      let inQ = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-          else { inQ = !inQ; }
-        } else if (ch === delimiter && !inQ) {
-          parts.push(cur.trim());
-          cur = '';
-        } else {
-          cur += ch;
-        }
-      }
-      parts.push(cur.trim());
-      return parts;
-    });
-  }
-
-  if (!rows || rows.length === 0) return [];
-
-  // Check if first row is a header row
-  const firstRow = rows[0];
+  const firstRow = cleanRows[0];
   const firstRowNormalized = firstRow.map(c => sanitizeKey(String(c)));
   const hasQuestionHeader = firstRowNormalized.some(k =>
     k.includes('question') || k === 'qtext' || k === 'q' || k === 'questions' || k.includes('problem')
   );
 
   let headerMap = null;
-  let dataRows = rows;
+  let dataRows = cleanRows;
 
   if (hasQuestionHeader) {
     headerMap = {};
@@ -125,7 +84,7 @@ const parseCsvString = (content) => {
         headerMap.difficultyLevel = idx;
       }
     });
-    dataRows = rows.slice(1);
+    dataRows = cleanRows.slice(1);
   }
 
   const results = [];
@@ -149,7 +108,6 @@ const parseCsvString = (content) => {
       diff = headerMap.difficultyLevel !== undefined ? row[headerMap.difficultyLevel] || 'Medium' : 'Medium';
     } else {
       // Positional inference when no header row
-      // Check if Col 0 is a Serial Number (e.g. 1, 2, 3...) and Col 1 is the question text
       let offset = 0;
       if (/^\d+$/.test(String(row[0]).trim()) && String(row[1]).trim().length > 5) {
         offset = 1;
@@ -157,8 +115,6 @@ const parseCsvString = (content) => {
 
       qText = row[offset] || '';
 
-      // Check if format has Category & Topic in next 2 columns:
-      // [S.No], Question, Category, Topic, OptionA, OptionB, OptionC, OptionD, Answer, [Explanation]
       if (row.length >= offset + 8 && ['A','B','C','D','1','2','3','4'].includes(String(row[offset + 7]).trim().toUpperCase())) {
         cat = row[offset + 1] || 'General';
         top = row[offset + 2] || 'General';
@@ -169,7 +125,6 @@ const parseCsvString = (content) => {
         rawAns = row[offset + 7] || 'A';
         expl = row[offset + 8] || '';
       } else {
-        // Standard format: [S.No], Question, OptionA, OptionB, OptionC, OptionD, Answer, [Category], [Topic], [Explanation]
         optA = row[offset + 1] || '';
         optB = row[offset + 2] || '';
         optC = row[offset + 3] || '';
@@ -204,10 +159,280 @@ const parseCsvString = (content) => {
   return results;
 };
 
+/**
+ * Delimited Text Parser (CSV, TSV, Semicolon)
+ */
+const parseCsvString = (content) => {
+  if (!content || !content.trim()) return [];
+
+  let cleanContent = content.replace(/^\uFEFF/, '');
+  const firstLines = cleanContent.split(/\r?\n/).slice(0, 5).join('\n');
+  const commaCount = (firstLines.match(/,/g) || []).length;
+  const semiCount = (firstLines.match(/;/g) || []).length;
+  const tabCount = (firstLines.match(/\t/g) || []).length;
+
+  let delimiter = ',';
+  if (semiCount > commaCount && semiCount > tabCount) {
+    delimiter = ';';
+  } else if (tabCount > commaCount && tabCount > semiCount) {
+    delimiter = '\t';
+  }
+
+  let rows = [];
+  try {
+    rows = parse(cleanContent, {
+      delimiter,
+      bom: true,
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
+      relax_quotes: true
+    });
+  } catch (err) {
+    const lines = cleanContent.split(/\r?\n/).filter(l => l.trim().length > 0);
+    rows = lines.map(line => {
+      const parts = [];
+      let cur = '';
+      let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+          else { inQ = !inQ; }
+        } else if (ch === delimiter && !inQ) {
+          parts.push(cur.trim());
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      parts.push(cur.trim());
+      return parts;
+    });
+  }
+
+  return parseRowsToQuestions(rows);
+};
+
+/**
+ * ENGINE 2: Exam Paper Block Pattern Recognition Parser
+ * Parses question documents commonly found in PDF, Word (docx), or freeform TXT
+ * Patterns supported:
+ * 1. Question text ...
+ * A) opt1  B) opt2  C) opt3  D) opt4
+ * Answer: B
+ * Explanation: ...
+ */
+const parseBlockQuestions = (rawText) => {
+  if (!rawText || !rawText.trim()) return [];
+
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return [];
+
+  const questions = [];
+  let currentQ = null;
+
+  // Regex patterns
+  const qStartRegex = /^(?:(?:Q(?:uestion)?\s*[\d.:\-#]+)|(?:\(?\d+\s*[\).:\-#]))\s*(.+)$/i;
+  const optARegex = /^(?:(?:\(?A[\).:\-]|\[A\]|Option\s*A\s*[:.\-]?))\s*(.+)$/i;
+  const optBRegex = /^(?:(?:\(?B[\).:\-]|\[B\]|Option\s*B\s*[:.\-]?))\s*(.+)$/i;
+  const optCRegex = /^(?:(?:\(?C[\).:\-]|\[C\]|Option\s*C\s*[:.\-]?))\s*(.+)$/i;
+  const optDRegex = /^(?:(?:\(?D[\).:\-]|\[D\]|Option\s*D\s*[:.\-]?))\s*(.+)$/i;
+  const ansRegex = /^(?:(?:Ans(?:wer)?|Correct(?:\s*Option|\s*Answer)?|Key)\s*[:.\-]?)\s*(.+)$/i;
+  const explRegex = /^(?:(?:Expla(?:nation)?|Solution|Reason|Hint)\s*[:.\-]?)\s*(.+)$/i;
+
+  const flushCurrentQuestion = () => {
+    if (currentQ && currentQ.questionText && (currentQ.optionA || currentQ.optionB)) {
+      const cleanAns = sanitizeAnswer(
+        currentQ.rawAnswer || 'A',
+        currentQ.optionA,
+        currentQ.optionB,
+        currentQ.optionC,
+        currentQ.optionD
+      );
+
+      questions.push({
+        questionText: currentQ.questionText.trim(),
+        optionA: (currentQ.optionA || '').trim(),
+        optionB: (currentQ.optionB || '').trim(),
+        optionC: (currentQ.optionC || '').trim(),
+        optionD: (currentQ.optionD || '').trim(),
+        correctAnswer: cleanAns,
+        category: (currentQ.category || 'General').trim(),
+        topic: (currentQ.topic || 'General').trim(),
+        explanation: (currentQ.explanation || '').trim(),
+        modelSet: 'Model 1',
+        difficultyLevel: 'Medium'
+      });
+    }
+    currentQ = null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check if line contains inline options on one line: A) opt1 B) opt2 C) opt3 D) opt4
+    const inlineMatch = line.match(/(?:(?:\(?A[\).:\-]|\[A\]))\s*(.+?)\s+(?:(?:\(?B[\).:\-]|\[B\]))\s*(.+?)\s+(?:(?:\(?C[\).:\-]|\[C\]))\s*(.+?)\s+(?:(?:\(?D[\).:\-]|\[D\]))\s*(.+)$/i);
+    if (inlineMatch && currentQ) {
+      currentQ.optionA = inlineMatch[1];
+      currentQ.optionB = inlineMatch[2];
+      currentQ.optionC = inlineMatch[3];
+      currentQ.optionD = inlineMatch[4];
+      continue;
+    }
+
+    // Check if new question begins
+    const qMatch = line.match(qStartRegex);
+    if (qMatch) {
+      flushCurrentQuestion();
+      currentQ = {
+        questionText: qMatch[1],
+        optionA: '',
+        optionB: '',
+        optionC: '',
+        optionD: '',
+        rawAnswer: '',
+        explanation: '',
+        category: 'General',
+        topic: 'General'
+      };
+      continue;
+    }
+
+    if (!currentQ) {
+      // If line is not empty and looks like a standalone question without Q number
+      if (line.endsWith('?') || line.length > 25) {
+        currentQ = {
+          questionText: line,
+          optionA: '',
+          optionB: '',
+          optionC: '',
+          optionD: '',
+          rawAnswer: '',
+          explanation: '',
+          category: 'General',
+          topic: 'General'
+        };
+      }
+      continue;
+    }
+
+    // Check for Options
+    const optAMatch = line.match(optARegex);
+    if (optAMatch) { currentQ.optionA = optAMatch[1]; continue; }
+
+    const optBMatch = line.match(optBRegex);
+    if (optBMatch) { currentQ.optionB = optBMatch[1]; continue; }
+
+    const optCMatch = line.match(optCRegex);
+    if (optCMatch) { currentQ.optionC = optCMatch[1]; continue; }
+
+    const optDMatch = line.match(optDRegex);
+    if (optDMatch) { currentQ.optionD = optDMatch[1]; continue; }
+
+    // Check for Answer
+    const ansMatch = line.match(ansRegex);
+    if (ansMatch) { currentQ.rawAnswer = ansMatch[1]; continue; }
+
+    // Check for Explanation
+    const explMatch = line.match(explRegex);
+    if (explMatch) { currentQ.explanation = explMatch[1]; continue; }
+
+    // Multi-line continuation
+    if (currentQ.explanation) {
+      currentQ.explanation += ' ' + line;
+    } else if (currentQ.optionD) {
+      currentQ.optionD += ' ' + line;
+    } else if (currentQ.optionC) {
+      currentQ.optionC += ' ' + line;
+    } else if (currentQ.optionB) {
+      currentQ.optionB += ' ' + line;
+    } else if (currentQ.optionA) {
+      currentQ.optionA += ' ' + line;
+    } else if (currentQ.questionText) {
+      currentQ.questionText += ' ' + line;
+    }
+  }
+
+  flushCurrentQuestion();
+  return questions;
+};
+
+/**
+ * Universal Question Extractor for Any File Format
+ * Supports: .xlsx, .xls, .docx, .doc, .pdf, .csv, .txt
+ */
+const parseUniversalQuestions = async (filePath, originalFilename = '') => {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found at path: ${filePath}`);
+  }
+
+  const ext = (path.extname(originalFilename || filePath) || '').toLowerCase();
+
+  // 1. Excel Spreadsheets (.xlsx, .xls)
+  if (ext === '.xlsx' || ext === '.xls') {
+    const workbook = xlsx.readFile(filePath);
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return [];
+    }
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const questions = parseRowsToQuestions(rows);
+    if (questions.length > 0) return questions;
+  }
+
+  // 2. Word Documents (.docx)
+  if (ext === '.docx') {
+    try {
+      const docResult = await mammoth.extractRawText({ path: filePath });
+      const text = docResult.value || '';
+      let questions = parseBlockQuestions(text);
+      if (questions.length === 0) {
+        questions = parseCsvString(text);
+      }
+      if (questions.length > 0) return questions;
+    } catch (e) {
+      console.warn('Mammoth docx parse warning:', e.message);
+    }
+  }
+
+  // 3. PDF Documents (.pdf)
+  if (ext === '.pdf') {
+    try {
+      const dataBuffer = fs.readFileSync(filePath);
+      const pdfData = await pdfParse(dataBuffer);
+      const text = pdfData.text || '';
+      let questions = parseBlockQuestions(text);
+      if (questions.length === 0) {
+        questions = parseCsvString(text);
+      }
+      if (questions.length > 0) return questions;
+    } catch (e) {
+      console.warn('PDF parse warning:', e.message);
+    }
+  }
+
+  // 4. CSV, Text, or Fallback
+  const buffer = fs.readFileSync(filePath);
+  let content;
+  if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+    content = buffer.toString('utf16le');
+  } else {
+    content = buffer.toString('utf8');
+  }
+
+  let questions = parseCsvString(content);
+  if (questions.length === 0) {
+    questions = parseBlockQuestions(content);
+  }
+
+  return questions;
+};
+
 const parseCsvQuestions = (filePath) => {
   const buffer = fs.readFileSync(filePath);
   let fileContent;
-  // Detect UTF-16LE BOM
   if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
     fileContent = buffer.toString('utf16le');
   } else {
@@ -218,11 +443,18 @@ const parseCsvQuestions = (filePath) => {
 
 const parseTextQuestions = (filePath) => {
   const buffer = fs.readFileSync(filePath);
-  return parseCsvString(buffer.toString('utf8'));
+  const content = buffer.toString('utf8');
+  let q = parseCsvString(content);
+  if (q.length === 0) q = parseBlockQuestions(content);
+  return q;
 };
 
 module.exports = {
+  parseUniversalQuestions,
+  parseRowsToQuestions,
   parseCsvQuestions,
   parseCsvString,
-  parseTextQuestions
+  parseBlockQuestions,
+  parseTextQuestions,
+  sanitizeAnswer
 };

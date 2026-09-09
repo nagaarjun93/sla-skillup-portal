@@ -18,6 +18,72 @@ export default function MockTestSettings() {
   const [uploadMsg, setUploadMsg] = useState('');
   const [uploadError, setUploadError] = useState('');
 
+  const mockFileInputRef = React.useRef(null);
+  const [isMockDragging, setIsMockDragging] = useState(false);
+  const [mockFilePreviewInfo, setMockFilePreviewInfo] = useState(null);
+
+  const getFileTypeLabel = (filename) => {
+    if (!filename) return 'Document';
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'pdf': return 'PDF Document';
+      case 'docx':
+      case 'doc': return 'Word Document';
+      case 'xlsx':
+      case 'xls': return 'Excel Spreadsheet';
+      case 'csv': return 'CSV File';
+      case 'txt': return 'Text File';
+      default: return 'Document';
+    }
+  };
+
+  const processSelectedMockFile = async (selected) => {
+    if (!selected) return;
+    const lowerName = selected.name.toLowerCase();
+    const validExts = ['.csv', '.txt', '.pdf', '.docx', '.doc', '.xlsx', '.xls'];
+    const isValid = validExts.some(ext => lowerName.endsWith(ext));
+
+    if (!isValid) {
+      setUploadError('Please select a supported question file (.csv, .xlsx, .xls, .pdf, .docx, .doc, .txt)');
+      setMockFile(null);
+      setMockFilePreviewInfo(null);
+      return;
+    }
+
+    setMockFile(selected);
+    setUploadError('');
+    setUploadMsg('');
+
+    const sizeFormatted = selected.size > 1024 * 1024
+      ? `${(selected.size / (1024 * 1024)).toFixed(2)} MB`
+      : `${Math.round(selected.size / 1024)} KB`;
+
+    const fileType = getFileTypeLabel(selected.name);
+
+    if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt')) {
+      try {
+        const text = await selected.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const rowCount = Math.max(0, lines.length - 1);
+        setMockFilePreviewInfo({
+          fileName: selected.name,
+          size: sizeFormatted,
+          type: fileType,
+          detectedRows: rowCount > 0 ? rowCount : lines.length
+        });
+      } catch (err) {
+        setMockFilePreviewInfo({ fileName: selected.name, size: sizeFormatted, type: fileType, detectedRows: 'Ready' });
+      }
+    } else {
+      setMockFilePreviewInfo({
+        fileName: selected.name,
+        size: sizeFormatted,
+        type: fileType,
+        detectedRows: 'Ready for auto-extraction'
+      });
+    }
+  };
+
   // Question Viewer Modal State (Full Screen / Large)
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewingModel, setViewingModel] = useState('Model 1');
@@ -123,7 +189,7 @@ export default function MockTestSettings() {
     e.preventDefault();
 
     if (mockInputMode === 'file' && !mockFile) {
-      setUploadError('Please select a CSV file first');
+      setUploadError('Please select a question file first (.csv, .xlsx, .pdf, .docx, .txt)');
       return;
     }
     if (mockInputMode === 'text' && !mockCsvText.trim()) {
@@ -156,12 +222,11 @@ export default function MockTestSettings() {
           formData.append('replaceExisting', 'true');
         }
 
-        const res = await api.post('/admin/mock/questions/upload-csv', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        const replacedText = replaceExisting ? ' (pazhaiya questions remove panniyachu)' : '';
-        setUploadMsg(res.data.message || `Mock questions uploaded to ${selectedTargetModel}${replacedText}!`);
+        const res = await api.post('/admin/mock/questions/upload-csv', formData);
+        setUploadMsg(res.data.message || `Mock questions uploaded successfully to ${selectedTargetModel}! 🎉`);
         setMockFile(null);
+        setMockFilePreviewInfo(null);
+        fetchInitialData();
       } else {
         // Direct Text Paste Mode
         const rawLines = mockCsvText.split(/\r?\n/).filter(l => l.trim().length > 0);
@@ -460,11 +525,14 @@ export default function MockTestSettings() {
             <button
               type="button"
               className={`btn ${mockInputMode === 'file' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setMockInputMode('file')}
+              onClick={() => {
+                setMockInputMode('file');
+                setTimeout(() => mockFileInputRef.current?.click(), 50);
+              }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', padding: '6px 14px' }}
             >
               <UploadCloud size={15} />
-              <span>CSV File</span>
+              <span>Pick / Drop Question File</span>
             </button>
             <button
               type="button"
@@ -492,14 +560,107 @@ export default function MockTestSettings() {
             </div>
 
             {mockInputMode === 'file' ? (
-              <div className="form-group">
-                <label className="form-label">Select CSV Spreadsheet File</label>
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  className="form-input"
-                  onChange={e => setMockFile(e.target.files[0])}
-                />
+              <div style={{ marginBottom: '16px' }}>
+                <div
+                  style={{
+                    border: isMockDragging ? '2px dashed #2563eb' : '2px dashed #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '24px 16px',
+                    textAlign: 'center',
+                    backgroundColor: isMockDragging ? '#eff6ff' : '#f8fafc',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isMockDragging ? '0 0 0 4px rgba(37, 99, 235, 0.15)' : 'none',
+                  }}
+                  onClick={() => mockFileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsMockDragging(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsMockDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsMockDragging(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      processSelectedMockFile(e.dataTransfer.files[0]);
+                    }
+                  }}
+                >
+                  <input
+                    ref={mockFileInputRef}
+                    type="file"
+                    accept=".csv,.txt,.pdf,.docx,.doc,.xlsx,.xls"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        processSelectedMockFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+
+                  {mockFile ? (
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #bfdbfe',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                      }}>
+                        <UploadCloud size={20} color="#2563eb" />
+                        <div style={{ textAlign: 'left' }}>
+                          <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{mockFile.name}</div>
+                          <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                            <span style={{ fontWeight: '700', color: '#2563eb' }}>{mockFilePreviewInfo?.type || 'Document'}</span> • {mockFilePreviewInfo?.size || ''} {mockFilePreviewInfo?.detectedRows ? `• ~${mockFilePreviewInfo.detectedRows} items` : ''}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMockFile(null);
+                            setMockFilePreviewInfo(null);
+                          }}
+                          style={{
+                            marginLeft: '8px',
+                            border: 'none',
+                            background: '#f1f5f9',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#64748b'
+                          }}
+                          title="Remove file"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#16a34a', fontWeight: '700' }}>
+                        ✅ Ready to upload into {selectedTargetModel}! Click button below.
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <UploadCloud size={36} color={isMockDragging ? '#2563eb' : '#94a3b8'} style={{ margin: '0 auto 8px' }} />
+                      <div style={{ fontWeight: '800', fontSize: '13.5px', color: '#1e293b', marginBottom: '4px' }}>
+                        Click to open file picker or Drag & Drop here
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '8px' }}>
+                        Supports: <strong>CSV, Excel (.xlsx, .xls), PDF (.pdf), Word (.docx, .doc), TXT</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="form-group">

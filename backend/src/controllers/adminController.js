@@ -3,7 +3,7 @@ const Result = require('../models/Result');
 const Student = require('../models/Student');
 const WeeklyTest = require('../models/WeeklyTest');
 const StudentMockAccess = require('../models/StudentMockAccess');
-const { parseCsvQuestions, parseTextQuestions } = require('../services/fileParserService');
+const { parseUniversalQuestions, parseCsvQuestions, parseTextQuestions } = require('../services/fileParserService');
 const fs = require('fs');
 
 // --- Question Management ---
@@ -100,14 +100,16 @@ exports.uploadQuestionFile = async (req, res, next) => {
 exports.uploadQuestionsCsv = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'CSV file is required' });
+      return res.status(400).json({ message: 'File is required (.csv, .xlsx, .pdf, .docx, .txt)' });
     }
 
     const { weeklyTestId, category, topic } = req.body;
-    const rawQuestions = parseCsvQuestions(req.file.path);
+    const rawQuestions = await parseUniversalQuestions(req.file.path, req.file.originalname);
 
     if (!rawQuestions || rawQuestions.length === 0) {
-      return res.status(400).json({ message: 'No valid questions could be parsed from the CSV file. Please check column headers and content.' });
+      return res.status(400).json({
+        message: 'No valid questions could be parsed from this file. Please check file format and question structure.'
+      });
     }
 
     let fallbackCategory = category || 'General';
@@ -147,7 +149,7 @@ exports.uploadQuestionsCsv = async (req, res, next) => {
     }
 
     res.status(201).json({
-      message: `${inserted.length} questions uploaded successfully`,
+      message: `${inserted.length} questions uploaded successfully from ${req.file.originalname}`,
       count: inserted.length,
       inserted
     });
@@ -167,14 +169,13 @@ exports.parseQuestionsFile = async (req, res, next) => {
       return res.status(400).json({ message: 'File is required for parsing' });
     }
 
-    let parsedQuestions = [];
-    if (req.file.originalname.endsWith('.csv')) {
-      parsedQuestions = parseCsvQuestions(req.file.path);
-    } else {
-      parsedQuestions = parseTextQuestions(req.file.path);
-    }
+    const parsedQuestions = await parseUniversalQuestions(req.file.path, req.file.originalname);
 
-    res.json({ message: 'File parsed successfully', preview: parsedQuestions });
+    res.json({
+      message: `${parsedQuestions.length} questions parsed successfully`,
+      preview: parsedQuestions,
+      count: parsedQuestions.length
+    });
   } catch (error) {
     next(error);
   } finally {

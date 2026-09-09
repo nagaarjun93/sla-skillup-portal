@@ -3,7 +3,7 @@ const MockResult = require('../models/MockResult');
 const MockSettings = require('../models/MockSettings');
 const StudentMockAccess = require('../models/StudentMockAccess');
 const Student = require('../models/Student');
-const { parseCsvQuestions } = require('../services/fileParserService');
+const { parseUniversalQuestions, parseCsvQuestions } = require('../services/fileParserService');
 const fs = require('fs');
 
 // --- Admin Mock Operations ---
@@ -59,14 +59,14 @@ exports.saveBulkMockQuestions = async (req, res, next) => {
 exports.uploadMockQuestionsCsv = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'CSV file is required' });
+      return res.status(400).json({ message: 'File is required (.csv, .xlsx, .pdf, .docx, .txt)' });
     }
     const targetModelSet = req.body.targetModelSet || 'Model 1';
     const replaceExisting = req.body.replaceExisting === true || req.body.replaceExisting === 'true';
 
-    const records = parseCsvQuestions(req.file.path);
+    const records = await parseUniversalQuestions(req.file.path, req.file.originalname);
     if (!records || records.length === 0) {
-      return res.status(400).json({ message: 'No valid questions could be parsed from the CSV file. Please check column headers.' });
+      return res.status(400).json({ message: 'No valid questions could be parsed from this file. Please check column headers or question structure.' });
     }
 
     const validQuestions = records.filter(r => r.questionText && r.optionA && r.optionB && r.optionC && r.optionD);
