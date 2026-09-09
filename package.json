@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "SLA SkillUp Portal",
   "scripts": {
-    "build": "npm --prefix backend install",
+    "build": "npm --prefix admin-web install && npm --prefix admin-web run build",
     "start": "npm --prefix backend start"
   }
 }
