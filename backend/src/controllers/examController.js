@@ -107,14 +107,47 @@ exports.getExamQuestions = async (req, res, next) => {
       if (catConfig) durationMinutes = catConfig.durationMinutes;
     }
 
-    let query = Question.find(filter).limit(Number(limit));
-    if (practice === 'true' || practice === true) {
-      // In practice mode (Paper & Pen practice), allow viewing answers and explanations
-    } else {
-      query = query.select('-correctAnswer -explanation');
-    }
+    let questions = [];
 
-    const questions = await query;
+    if (practice === 'true' || practice === true) {
+      // In practice mode (Paper & Pen practice): return all questions (latest and previous archive)
+      questions = await Question.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(Number(limit));
+    } else {
+      // In Take Exam mode (Timed test): dynamically serve the latest uploaded batch
+      if (weeklyTestId) {
+        questions = await Question.find(filter)
+          .select('-correctAnswer -explanation')
+          .sort({ createdAt: -1 })
+          .limit(Number(limit));
+      } else {
+        const latestQ = await Question.findOne(filter).sort({ createdAt: -1 });
+        let examFilter = { ...filter };
+
+        if (latestQ) {
+          if (latestQ.uploadBatchId) {
+            examFilter.uploadBatchId = latestQ.uploadBatchId;
+          } else if (latestQ.createdAt) {
+            const windowStart = new Date(new Date(latestQ.createdAt).getTime() - 10 * 60 * 1000);
+            examFilter.createdAt = { $gte: windowStart };
+          }
+        }
+
+        questions = await Question.find(examFilter)
+          .select('-correctAnswer -explanation')
+          .sort({ createdAt: -1 })
+          .limit(Number(limit));
+
+        // Fallback: if batch has fewer than 5 questions and more exist, use latest questions
+        if (questions.length < 5) {
+          questions = await Question.find(filter)
+            .select('-correctAnswer -explanation')
+            .sort({ createdAt: -1 })
+            .limit(Number(limit));
+        }
+      }
+    }
 
     res.json({
       category: category || searchTarget || 'General',

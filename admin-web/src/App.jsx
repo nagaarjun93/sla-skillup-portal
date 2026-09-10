@@ -5,6 +5,7 @@ import AdminLayout from './components/AdminLayout';
 import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
 import QuestionBank from './pages/QuestionBank';
+import ManageQuestions from './pages/ManageQuestions';
 import QuestionUpload from './pages/QuestionUpload';
 import WeeklyTests from './pages/WeeklyTests';
 import ThisWeekQuestions from './pages/ThisWeekQuestions';
@@ -47,7 +48,8 @@ export default function App() {
             }
           >
             <Route index element={<Dashboard />} />
-            <Route path="questions" element={<QuestionBank />} />
+            <Route path="questions" element={<ManageQuestions />} />
+            <Route path="manage-questions" element={<ManageQuestions />} />
             <Route path="upload-questions" element={<QuestionUpload />} />
             <Route path="weekly-tests" element={<WeeklyTests />} />
             <Route path="this-week-questions" element={<ThisWeekQuestions />} />

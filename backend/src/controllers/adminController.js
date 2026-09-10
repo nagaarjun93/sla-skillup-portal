@@ -1,4 +1,5 @@
 const Question = require('../models/Question');
+const MockQuestion = require('../models/MockQuestion');
 const Result = require('../models/Result');
 const Student = require('../models/Student');
 const WeeklyTest = require('../models/WeeklyTest');
@@ -121,6 +122,7 @@ exports.uploadQuestionsCsv = async (req, res, next) => {
       }
     }
 
+    const batchId = 'batch_' + Date.now();
     const questionsToInsert = rawQuestions.map(q => ({
       questionText: q.questionText,
       optionA: q.optionA,
@@ -132,7 +134,8 @@ exports.uploadQuestionsCsv = async (req, res, next) => {
       topic: q.topic && q.topic !== 'General' ? q.topic : fallbackTopic,
       difficultyLevel: q.difficultyLevel || 'Medium',
       explanation: q.explanation || '',
-      weeklyTestId: weeklyTestId || null
+      weeklyTestId: weeklyTestId || null,
+      uploadBatchId: batchId
     }));
 
     const inserted = await Question.insertMany(questionsToInsert);
@@ -208,12 +211,14 @@ exports.saveBulkQuestions = async (req, res, next) => {
       }
     }
 
+    const batchId = 'batch_' + Date.now();
     const questionsToInsert = validQuestions.map(q => ({
       ...q,
       correctAnswer: (q.correctAnswer || 'A').toUpperCase(),
       category: q.category && q.category !== 'General' ? q.category : fallbackCategory,
       topic: q.topic && q.topic !== 'General' ? q.topic : fallbackTopic,
-      weeklyTestId: q.weeklyTestId || targetWeeklyId || null
+      weeklyTestId: q.weeklyTestId || targetWeeklyId || null,
+      uploadBatchId: batchId
     }));
 
     const inserted = await Question.insertMany(questionsToInsert);
@@ -254,7 +259,207 @@ exports.deleteQuestion = async (req, res, next) => {
     if (!question) {
       return res.status(404).json({ message: 'Question not found' });
     }
+    if (question.weeklyTestId) {
+      const count = await Question.countDocuments({ weeklyTestId: question.weeklyTestId });
+      await WeeklyTest.findByIdAndUpdate(question.weeklyTestId, { totalQuestions: count });
+    }
     res.json({ message: 'Question deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/admin/questions-manage
+exports.getManageQuestions = async (req, res, next) => {
+  try {
+    const {
+      type = 'topic', // 'topic' | 'weekly' | 'mock'
+      category,
+      topic,
+      weeklyTestId,
+      modelSet,
+      search,
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, Math.min(200, parseInt(limit) || 50));
+    const skip = (pageNum - 1) * limitNum;
+
+    let filter = {};
+    let questions = [];
+    let total = 0;
+
+    if (type === 'mock') {
+      if (modelSet && modelSet !== 'all') {
+        filter.modelSet = modelSet;
+      }
+      if (search && search.trim()) {
+        const s = search.trim();
+        filter.$or = [
+          { questionText: { $regex: s, $options: 'i' } },
+          { topic: { $regex: s, $options: 'i' } },
+          { category: { $regex: s, $options: 'i' } }
+        ];
+      }
+      total = await MockQuestion.countDocuments(filter);
+      questions = await MockQuestion.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+    } else if (type === 'weekly') {
+      filter.weeklyTestId = { $ne: null };
+      if (weeklyTestId && weeklyTestId !== 'all') {
+        filter.weeklyTestId = weeklyTestId;
+      }
+      if (search && search.trim()) {
+        const s = search.trim();
+        filter.$or = [
+          { questionText: { $regex: s, $options: 'i' } },
+          { topic: { $regex: s, $options: 'i' } }
+        ];
+      }
+      total = await Question.countDocuments(filter);
+      questions = await Question.find(filter)
+        .populate('weeklyTestId', 'title weekName weekNumber topic')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+    } else {
+      // type === 'topic' (Practice / Topic questions)
+      filter.weeklyTestId = null;
+      if (category && category !== 'all') {
+        filter.category = category;
+      }
+      if (topic && topic !== 'all') {
+        filter.topic = topic;
+      }
+      if (search && search.trim()) {
+        const s = search.trim();
+        filter.$or = [
+          { questionText: { $regex: s, $options: 'i' } },
+          { topic: { $regex: s, $options: 'i' } },
+          { category: { $regex: s, $options: 'i' } }
+        ];
+      }
+      total = await Question.countDocuments(filter);
+      questions = await Question.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+    }
+
+    // Fetch dynamic options for filters
+    const [topicCategories, distinctTopics, weeklyTests, mockModels] = await Promise.all([
+      Question.distinct('category', { weeklyTestId: null }),
+      Question.distinct('topic', { weeklyTestId: null }),
+      WeeklyTest.find().select('_id title weekName weekNumber topic totalQuestions').sort({ weekNumber: -1 }),
+      MockQuestion.distinct('modelSet')
+    ]);
+
+    res.json({
+      type,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum) || 1,
+      questions,
+      filters: {
+        categories: topicCategories.filter(Boolean),
+        topics: distinctTopics.filter(Boolean),
+        weeklyTests,
+        mockModels: mockModels.filter(Boolean)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/admin/questions/bulk-delete
+exports.bulkDeleteQuestions = async (req, res, next) => {
+  try {
+    const { ids, type = 'topic' } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No question IDs provided for deletion' });
+    }
+
+    let deletedCount = 0;
+    const affectedWeeklyTests = new Set();
+
+    if (type === 'mock') {
+      const result = await MockQuestion.deleteMany({ _id: { $in: ids } });
+      deletedCount = result.deletedCount;
+    } else {
+      if (type === 'weekly') {
+        const qs = await Question.find({ _id: { $in: ids } }).select('weeklyTestId');
+        qs.forEach(q => {
+          if (q.weeklyTestId) affectedWeeklyTests.add(q.weeklyTestId.toString());
+        });
+      }
+      const result = await Question.deleteMany({ _id: { $in: ids } });
+      deletedCount = result.deletedCount;
+
+      // Update weekly test counts
+      for (const wId of affectedWeeklyTests) {
+        const count = await Question.countDocuments({ weeklyTestId: wId });
+        await WeeklyTest.findByIdAndUpdate(wId, { totalQuestions: count });
+      }
+    }
+
+    res.json({
+      message: `Successfully deleted ${deletedCount} question(s)`,
+      deletedCount
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/admin/questions/delete-by-scope
+exports.deleteQuestionsByScope = async (req, res, next) => {
+  try {
+    const { scope, topic, category, weeklyTestId, modelSet } = req.body;
+    let deletedCount = 0;
+
+    if (scope === 'mock') {
+      if (!modelSet) return res.status(400).json({ message: 'Model set required' });
+      const result = await MockQuestion.deleteMany({ modelSet });
+      deletedCount = result.deletedCount;
+    } else if (scope === 'weekly') {
+      if (!weeklyTestId) return res.status(400).json({ message: 'Weekly test ID required' });
+      const result = await Question.deleteMany({ weeklyTestId });
+      deletedCount = result.deletedCount;
+      await WeeklyTest.findByIdAndUpdate(weeklyTestId, { totalQuestions: 0 });
+    } else if (scope === 'topic') {
+      if (!topic && !category) return res.status(400).json({ message: 'Topic or category required' });
+      const filter = { weeklyTestId: null };
+      if (topic) filter.topic = topic;
+      if (category) filter.category = category;
+      const result = await Question.deleteMany(filter);
+      deletedCount = result.deletedCount;
+    } else {
+      return res.status(400).json({ message: 'Invalid scope specified' });
+    }
+
+    res.json({
+      message: `Successfully deleted ${deletedCount} question(s) from ${scope}`,
+      deletedCount
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /api/admin/mock-questions/:id
+exports.deleteMockQuestion = async (req, res, next) => {
+  try {
+    const question = await MockQuestion.findByIdAndDelete(req.params.id);
+    if (!question) {
+      return res.status(404).json({ message: 'Mock question not found' });
+    }
+    res.json({ message: 'Mock question deleted successfully' });
   } catch (error) {
     next(error);
   }

@@ -15,7 +15,8 @@ import {
   User,
   ChevronDown,
   Menu,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 export default function AdminLayout() {
@@ -50,6 +51,8 @@ export default function AdminLayout() {
   const getPageTitle = () => {
     switch (location.pathname) {
       case '/': return 'Dashboard Overview';
+      case '/manage-questions':
+      case '/questions': return 'Question Bank & Delete Manager';
       case '/upload-questions': return 'Weekly Test Question Upload';
       case '/weekly-tests': return 'Weekly Tests Schedule';
       case '/this-week-questions': return "This Week's Test Questions";
@@ -102,6 +105,14 @@ export default function AdminLayout() {
           </NavLink>
 
           <div className="nav-section-label">Questions & Tests</div>
+          <NavLink
+            to="/manage-questions"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <Trash2 />
+            <span>Manage / Delete Qs</span>
+          </NavLink>
           <NavLink
             to="/upload-questions"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}

@@ -10,12 +10,16 @@ router.use(protect, adminOnly);
 
 // Question Management
 router.get('/questions', adminController.getAllQuestions);
+router.get('/questions-manage', adminController.getManageQuestions);
 router.get('/questions/:id', adminController.getQuestionById);
 router.post('/questions/manual', validateQuestionManual, adminController.addQuestionManual);
 router.post('/questions/upload-file', upload.single('file'), adminController.uploadQuestionFile);
 router.post('/questions/upload-csv', upload.single('file'), adminController.uploadQuestionsCsv);
 router.post('/questions/parse-file', upload.single('file'), adminController.parseQuestionsFile);
 router.post('/questions/save-bulk', validateBulkQuestions, adminController.saveBulkQuestions);
+router.post('/questions/bulk-delete', adminController.bulkDeleteQuestions);
+router.post('/questions/delete-by-scope', adminController.deleteQuestionsByScope);
+router.delete('/mock-questions/:id', adminController.deleteMockQuestion);
 router.put('/questions/:id', adminController.updateQuestion);
 router.delete('/questions/:id', adminController.deleteQuestion);
 

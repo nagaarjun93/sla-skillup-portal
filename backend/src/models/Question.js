@@ -57,6 +57,11 @@ const questionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'WeeklyTest'
   },
+  uploadBatchId: {
+    type: String,
+    trim: true,
+    index: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
