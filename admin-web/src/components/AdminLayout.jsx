@@ -106,14 +106,6 @@ export default function AdminLayout() {
 
           <div className="nav-section-label">Questions & Tests</div>
           <NavLink
-            to="/manage-questions"
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileNavOpen(false)}
-          >
-            <Trash2 />
-            <span>Manage / Delete Qs</span>
-          </NavLink>
-          <NavLink
             to="/upload-questions"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             onClick={() => setMobileNavOpen(false)}
@@ -172,6 +164,16 @@ export default function AdminLayout() {
           >
             <Award />
             <span>Mock Results</span>
+          </NavLink>
+
+          <div className="nav-section-label">Questions Management</div>
+          <NavLink
+            to="/manage-questions"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            <Trash2 />
+            <span>Manage / Delete Qs</span>
           </NavLink>
         </nav>
       </aside>
