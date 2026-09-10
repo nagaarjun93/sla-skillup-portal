@@ -14,6 +14,7 @@ router.get('/categories/details', examController.getCategoryDetails);
 router.get('/exam', protect, examController.getExamQuestions);
 router.post('/results', protect, examController.submitExamResult);
 router.get('/results/:id/details', protect, adminController.getResultDetails);
+router.get('/topic-history', protect, examController.getStudentTopicHistory);
 router.get('/leaderboard', protect, examController.getLeaderboard);
 
 module.exports = router;

@@ -187,7 +187,8 @@ exports.getStudentWeeklyHistory = async (req, res, next) => {
   try {
     const studentId = req.user.id;
     const results = await Result.find({
-      student: studentId
+      student: studentId,
+      weeklyTestId: { $ne: null }
     }).populate('weeklyTestId', 'title weekName weekNumber topic').sort({ submittedAt: -1 });
 
     res.json(results);

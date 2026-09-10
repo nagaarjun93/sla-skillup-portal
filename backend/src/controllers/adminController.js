@@ -563,14 +563,15 @@ exports.getResultDetails = async (req, res, next) => {
       return res.status(404).json({ message: 'Result not found' });
     }
 
-    // ── 24-Hour Review Lock Rule ──────────────────────────────────
+    // ── 24-Hour Review Lock Rule (ONLY for Weekly Tests, NOT Topic Practice) ──
     const now = Date.now();
     const submissionTime = new Date(result.submittedAt).getTime();
     const msSinceSubmission = now - submissionTime;
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
     const isStudent = req.user && req.user.role === 'student';
-    const canViewMistakes = !isStudent || (msSinceSubmission >= TWENTY_FOUR_HOURS_MS);
-    const msUntilReviewUnlock = Math.max(0, TWENTY_FOUR_HOURS_MS - msSinceSubmission);
+    const isWeeklyTest = !!result.weeklyTestId;
+    const canViewMistakes = !isStudent || !isWeeklyTest || (msSinceSubmission >= TWENTY_FOUR_HOURS_MS);
+    const msUntilReviewUnlock = isWeeklyTest ? Math.max(0, TWENTY_FOUR_HOURS_MS - msSinceSubmission) : 0;
 
     if (!canViewMistakes) {
       return res.json({

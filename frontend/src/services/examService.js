@@ -29,5 +29,10 @@ export const examService = {
   getLeaderboard: async (params = {}) => {
     const response = await api.get('/leaderboard', { params });
     return response.data;
+  },
+
+  getStudentTopicHistory: async () => {
+    const response = await api.get('/topic-history');
+    return response.data;
   }
 };

@@ -19,6 +19,7 @@ import ExamScreen from './src/screens/ExamScreen';
 import TopicQuestionsScreen from './src/screens/TopicQuestionsScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import PreviousTestsScreen from './src/screens/PreviousTestsScreen';
+import TopicHistoryScreen from './src/screens/TopicHistoryScreen';
 import StudentMockExamScreen from './src/screens/StudentMockExamScreen';
 import StudentProfileScreen from './src/screens/StudentProfileScreen';
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
@@ -114,6 +115,7 @@ export default function App() {
                 <Stack.Screen name="topic-questions" component={TopicQuestionsScreen} />
                 <Stack.Screen name="leaderboard" component={LeaderboardScreen} />
                 <Stack.Screen name="previous-tests" component={PreviousTestsScreen} />
+                <Stack.Screen name="topic-history" component={TopicHistoryScreen} />
                 <Stack.Screen name="student-mock-exam" component={StudentMockExamScreen} />
                 <Stack.Screen name="student-profile" component={StudentProfileScreen} />
                 <Stack.Screen name="admin-dashboard" component={AdminDashboardScreen} />

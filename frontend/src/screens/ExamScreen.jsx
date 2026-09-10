@@ -190,24 +190,34 @@ export default function ExamScreen() {
         }
       } else {
         // ── Regular Exam Submit ──
-        await examService.submitExamResult({
+        const res = await examService.submitExamResult({
           category: category || 'General',
           weeklyTestId: weeklyTestId || null,
           answers,
           timeTaken,
         });
+
+        const isWeekly = !!weeklyTestId;
+        const targetRoute = isWeekly ? 'previous-tests' : 'category-select';
+        const targetParams = isWeekly ? {} : { tab: 'history' };
+
+        const alertTitle = auto ? 'Time Expired' : 'Submitted Successfully';
+        const alertMsg = isWeekly
+          ? 'Your weekly test submission has been recorded. Detailed review will unlock in 24 hours.'
+          : 'Your topic practice test has been completed! Mistakes and solutions are available immediately in your Practice History.';
+
         if (Platform.OS === 'web') {
-          window.alert(auto ? 'Time Expired! Your test submission has been recorded.' : 'Test Submitted Successfully!');
-          router.replace('previous-tests');
+          window.alert(`${alertTitle}! ${alertMsg}`);
+          router.replace(targetRoute, targetParams);
         } else {
           Alert.alert(
-            auto ? 'Time Expired' : 'Submitted Successfully',
-            'Your test submission has been recorded. Redirecting to your finished tests history.',
+            alertTitle,
+            alertMsg,
             [
               {
-                text: 'OK',
+                text: 'View History',
                 onPress: () => {
-                  router.replace('previous-tests');
+                  router.replace(targetRoute, targetParams);
                 },
               },
             ]

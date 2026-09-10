@@ -22,7 +22,7 @@ import { COLORS, SHADOWS } from '../styles/theme';
 export default function ViewMistakesScreen({ route }) {
   const { role } = useArjunAuth();
   const router = useUniversalRouter();
-  const activeId = route?.params?.id || router.params?.id;
+  const activeId = route?.params?.id || router.params?.id || route?.params?.resultId || router.params?.resultId;
   const isMockParam = route?.params?.isMock || router.params?.isMock;
   const isMockResult = isMockParam === 'true' || isMockParam === true;
 
@@ -169,7 +169,7 @@ export default function ViewMistakesScreen({ route }) {
                 <Text style={styles.subText}>Email: {result.student?.email}</Text>
                 <Text style={styles.subText}>Course: {result.student?.courseName}</Text>
                 <Text style={styles.subText}>
-                  Test: {isMockResult ? `Official Mock Test (${result.student?.assignedMockModel || 'Model Set'})` : (result.category || 'Weekly Test')}
+                  Test: {isMockResult ? `Official Mock Test (${result.student?.assignedMockModel || 'Model Set'})` : (result.weeklyTestId ? (result.weeklyTestId?.title || result.weeklyTestId?.weekName || `${result.category || 'Weekly'} Test`) : `${result.category || 'Topic'} Practice Exam`)}
                 </Text>
               </View>
 

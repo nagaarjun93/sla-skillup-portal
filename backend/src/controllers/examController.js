@@ -224,7 +224,7 @@ exports.submitExamResult = async (req, res, next) => {
       isPassed = score >= Math.ceil(total * 0.5);
     }
 
-    await Result.create({
+    const newResult = await Result.create({
       student: studentId,
       category: category || 'General',
       score,
@@ -237,10 +237,11 @@ exports.submitExamResult = async (req, res, next) => {
       isPassed
     });
 
-    // Business Rule 2: Student NEVER sees marks upon submission, only success status
     res.json({
       message: 'Test submitted successfully',
-      status: 'SUCCESS'
+      status: 'SUCCESS',
+      resultId: newResult._id,
+      isWeeklyTest: !!weeklyTestId
     });
   } catch (error) {
     next(error);
@@ -375,6 +376,21 @@ exports.getLeaderboard = async (req, res, next) => {
       totalParticipants,
       leaderboard
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/topic-history
+exports.getStudentTopicHistory = async (req, res, next) => {
+  try {
+    const studentId = req.user.id;
+    const results = await Result.find({
+      student: studentId,
+      weeklyTestId: null
+    }).sort({ submittedAt: -1 });
+
+    res.json(results);
   } catch (error) {
     next(error);
   }
