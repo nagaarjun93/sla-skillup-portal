@@ -40,11 +40,11 @@ function getTransporter() {
 async function sendOtpEmail({ toEmail, studentName, otp }) {
   const mailTransporter = getTransporter();
 
-  // If email credentials not yet provided in .env, log for development
+  // If email credentials not yet provided in .env, throw explicit error
   if (!mailTransporter) {
-    console.warn(`[EMAIL SERVICE] ⚠️ EMAIL_USER or EMAIL_PASS not configured in .env.`);
-    console.log(`[EMAIL SERVICE] 🔑 [DEV OTP]: ${otp} for email: ${toEmail}`);
-    return { success: true, devMode: true };
+    const errorMsg = 'SMTP email credentials (EMAIL_USER & EMAIL_PASS) are not configured in backend/.env. Real email could not be sent.';
+    console.error(`[EMAIL SERVICE] ❌ ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
   const fromAddress = process.env.EMAIL_FROM || `"SLA SkillUp Portal" <${process.env.EMAIL_USER}>`;

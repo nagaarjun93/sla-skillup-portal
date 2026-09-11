@@ -230,6 +230,7 @@ exports.requestForgotPassword = async (req, res, next) => {
 
     // Send real email OTP via Nodemailer
     let emailSent = false;
+    let mailErrorReason = '';
     if (student.email) {
       try {
         await sendOtpEmail({
@@ -239,8 +240,17 @@ exports.requestForgotPassword = async (req, res, next) => {
         });
         emailSent = true;
       } catch (mailErr) {
-        console.error('[EMAIL ERROR] Failed sending OTP email:', mailErr);
+        console.error('[EMAIL ERROR] Failed sending OTP email:', mailErr.message);
+        mailErrorReason = mailErr.message;
       }
+    }
+
+    const isEmailRequest = Boolean(email && email.trim()) || identifier.includes('@');
+    if (isEmailRequest && !emailSent) {
+      return res.status(500).json({
+        success: false,
+        message: mailErrorReason || 'Unable to send OTP email. Please ensure EMAIL_USER and EMAIL_PASS are configured in backend/.env'
+      });
     }
 
     let maskedEmail = '';
@@ -264,8 +274,7 @@ exports.requestForgotPassword = async (req, res, next) => {
       phone: student.phone,
       maskedEmail,
       maskedPhone,
-      emailSent,
-      otp // for convenient dev & testing
+      emailSent
     });
   } catch (error) {
     next(error);

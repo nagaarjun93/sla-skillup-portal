@@ -32,7 +32,6 @@ export default function StudentForgotPasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [otpDevHint, setOtpDevHint] = useState('');
   const [maskedTarget, setMaskedTarget] = useState('');
 
   const getActiveIdentifier = () => {
@@ -68,9 +67,6 @@ export default function StudentForgotPasswordScreen() {
     setLoading(true);
     try {
       const res = await authService.requestForgotPassword(identifier);
-      if (res.otp) {
-        setOtpDevHint(res.otp);
-      }
       const displayTarget = res.maskedEmail || res.maskedPhone || identifier;
       setMaskedTarget(displayTarget);
 
@@ -311,13 +307,6 @@ export default function StudentForgotPasswordScreen() {
                   </Text>
                 )}
               </View>
-
-              {otpDevHint ? (
-                <View style={styles.devHintBox}>
-                  <Text style={styles.devHintLabel}>Demo / Dev OTP Code:</Text>
-                  <Text style={styles.devHintCode}>{otpDevHint}</Text>
-                </View>
-              ) : null}
 
               <Text style={styles.label}>Enter 6-Digit Verification Code</Text>
               <TextInput
