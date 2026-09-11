@@ -19,12 +19,9 @@ import { COLORS, SHADOWS } from '../styles/theme';
 export default function StudentForgotPasswordScreen() {
   const router = useUniversalRouter();
 
-  // Mode: 'email' (primary) or 'phone'
-  const [authMode, setAuthMode] = useState('email');
   const [step, setStep] = useState(1);
 
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -35,46 +32,32 @@ export default function StudentForgotPasswordScreen() {
   const [maskedTarget, setMaskedTarget] = useState('');
 
   const getActiveIdentifier = () => {
-    return authMode === 'email' ? email.trim().toLowerCase() : phone.trim();
+    return email.trim().toLowerCase();
   };
 
-  // Step 1: Request OTP for Registered Email or Phone
+  // Step 1: Request OTP for Registered Email
   const handleRequestOtp = async () => {
     const identifier = getActiveIdentifier();
     if (!identifier) {
-      Alert.alert(
-        'Required',
-        authMode === 'email'
-          ? 'Please enter your registered email address'
-          : 'Please enter your registered mobile number'
-      );
+      Alert.alert('Required', 'Please enter your registered email address');
       return;
     }
 
-    if (authMode === 'email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(identifier)) {
-        Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. student@gmail.com)');
-        return;
-      }
-    } else {
-      if (identifier.length < 10) {
-        Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number');
-        return;
-      }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(identifier)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. student@gmail.com)');
+      return;
     }
 
     setLoading(true);
     try {
       const res = await authService.requestForgotPassword(identifier);
-      const displayTarget = res.maskedEmail || res.maskedPhone || identifier;
+      const displayTarget = res.maskedEmail || identifier;
       setMaskedTarget(displayTarget);
 
       Alert.alert(
-        authMode === 'email' ? 'OTP Sent to Email! 📬' : 'OTP Sent to Mobile! 📲',
-        authMode === 'email'
-          ? `A 6-digit verification code has been sent to ${displayTarget}. Please check your inbox (and spam/junk folder).`
-          : `A 6-digit verification code has been sent to ${displayTarget}.`,
+        'OTP Sent to Email! 📬',
+        `A 6-digit verification code has been sent to ${displayTarget}. Please check your inbox (and spam/junk folder).`,
         [{ text: 'OK' }]
       );
       setStep(2);
@@ -202,79 +185,31 @@ export default function StudentForgotPasswordScreen() {
 
           <View style={styles.stepLabelsRow}>
             <Text style={[styles.stepLabel, step === 1 && styles.stepLabelActive]}>
-              {authMode === 'email' ? 'Email' : 'Mobile'}
+              Email
             </Text>
             <Text style={[styles.stepLabel, step === 2 && styles.stepLabelActive]}>Verify OTP</Text>
             <Text style={[styles.stepLabel, step === 3 && styles.stepLabelActive]}>New Password</Text>
           </View>
 
-          {/* STEP 1: Enter Email or Phone */}
+          {/* STEP 1: Enter Registered Email Address */}
           {step === 1 && (
             <View style={styles.stepBody}>
-              {/* Method Selector Tabs */}
-              <View style={styles.methodSelector}>
-                <TouchableOpacity
-                  style={[styles.methodBtn, authMode === 'email' && styles.methodBtnActive]}
-                  onPress={() => setAuthMode('email')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.methodBtnText, authMode === 'email' && styles.methodBtnTextActive]}>
-                    ✉️ Via Email Address
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.methodBtn, authMode === 'phone' && styles.methodBtnActive]}
-                  onPress={() => setAuthMode('phone')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.methodBtnText, authMode === 'phone' && styles.methodBtnTextActive]}>
-                    📱 Via Mobile Number
-                  </Text>
-                </TouchableOpacity>
+              <Text style={styles.label}>Registered Email Address</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. student@gmail.com"
+                  placeholderTextColor={COLORS.gray400}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
+                />
               </View>
-
-              {authMode === 'email' ? (
-                <>
-                  <Text style={styles.label}>Registered Email Address</Text>
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="e.g. student@gmail.com"
-                      placeholderTextColor={COLORS.gray400}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      value={email}
-                      onChangeText={setEmail}
-                    />
-                  </View>
-                  <Text style={styles.helperText}>
-                    We will send a 6-digit verification code directly to your email inbox.
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.label}>Registered Mobile Number</Text>
-                  <View style={styles.phoneInputRow}>
-                    <View style={styles.countryCodeBox}>
-                      <Text style={styles.countryCodeText}>+91</Text>
-                    </View>
-                    <TextInput
-                      style={styles.phoneInput}
-                      placeholder="9876543210"
-                      placeholderTextColor={COLORS.gray400}
-                      keyboardType="phone-pad"
-                      maxLength={10}
-                      value={phone}
-                      onChangeText={(val) => setPhone(val.replace(/[^0-9]/g, ''))}
-                    />
-                  </View>
-                  <Text style={styles.helperText}>
-                    We will check your registered mobile number and send an OTP code.
-                  </Text>
-                </>
-              )}
+              <Text style={styles.helperText}>
+                We will send a 6-digit verification code directly to your email inbox.
+              </Text>
 
               <TouchableOpacity
                 style={[styles.primaryBtn, loading && styles.disabledBtn]}

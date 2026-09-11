@@ -181,46 +181,38 @@ exports.loginAdmin = async (req, res, next) => {
 exports.requestForgotPassword = async (req, res, next) => {
   try {
     const { phone, email } = req.body;
-    const identifier = (phone || email || '').trim();
+    const identifier = (email || phone || '').trim();
 
     if (!identifier) {
-      return res.status(400).json({ message: 'Registered mobile number or email is required' });
+      return res.status(400).json({ message: 'Registered student email address is required' });
     }
 
-    const cleanDigits = identifier.replace(/[^0-9]/g, '');
-    const searchCriteria = [];
-
-    if (phone || (!identifier.includes('@') && cleanDigits.length >= 7)) {
+    let student = null;
+    if (identifier.includes('@') || email) {
+      student = await Student.findOne({ email: identifier.toLowerCase() });
+    } else {
+      const cleanDigits = identifier.replace(/[^0-9]/g, '');
       const last10 = cleanDigits.slice(-10);
-      searchCriteria.push({ phone: identifier });
-      searchCriteria.push({ phone: cleanDigits });
-      searchCriteria.push({ phone: { $regex: last10 + '$' } });
+      student = await Student.findOne({
+        $or: [{ phone: identifier }, { phone: cleanDigits }, { phone: { $regex: last10 + '$' } }]
+      });
     }
 
-    if (email || identifier.includes('@')) {
-      searchCriteria.push({ email: identifier.toLowerCase() });
-    }
-
-    const student = await Student.findOne({ $or: searchCriteria });
     if (!student) {
       return res.status(404).json({
-        message: phone ? 'No registered student account found with this phone number' : 'Registered student account not found'
+        message: 'No registered student account found with this email address'
       });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
-    // Upsert verification record
-    const orQuery = [];
-    if (student.email) orQuery.push({ email: student.email.toLowerCase() });
-    if (student.phone) orQuery.push({ phone: student.phone });
-
+    // Upsert verification record strictly keyed by student email
     await OtpVerification.findOneAndUpdate(
-      orQuery.length > 0 ? { $or: orQuery } : { email: student.email },
+      { email: student.email.toLowerCase() },
       {
         phone: student.phone || '',
-        email: student.email ? student.email.toLowerCase() : '',
+        email: student.email.toLowerCase(),
         otp,
         expiryTime,
         verified: false
@@ -285,28 +277,24 @@ exports.requestForgotPassword = async (req, res, next) => {
 exports.verifyOtpOnly = async (req, res, next) => {
   try {
     const { phone, email, otp } = req.body;
-    const identifier = (phone || email || '').trim();
+    const identifier = (email || phone || '').trim();
 
     if (!identifier || !otp) {
-      return res.status(400).json({ message: 'Phone/Email and 6-digit OTP are required' });
+      return res.status(400).json({ message: 'Email and 6-digit OTP are required' });
     }
 
-    const cleanDigits = identifier.replace(/[^0-9]/g, '');
-    const last10 = cleanDigits.slice(-10);
-
-    const orConditions = [];
-    if (cleanDigits.length >= 7) {
-      orConditions.push({ phone: identifier });
-      orConditions.push({ phone: cleanDigits });
-      orConditions.push({ phone: { $regex: last10 + '$' } });
-    }
+    let query;
     if (identifier.includes('@') || email) {
-      orConditions.push({ email: identifier.toLowerCase() });
+      query = { email: identifier.toLowerCase() };
+    } else {
+      const cleanDigits = identifier.replace(/[^0-9]/g, '');
+      const last10 = cleanDigits.slice(-10);
+      query = {
+        $or: [{ phone: identifier }, { phone: cleanDigits }, { phone: { $regex: last10 + '$' } }]
+      };
     }
 
-    const record = await OtpVerification.findOne(
-      orConditions.length > 0 ? { $or: orConditions } : { email: identifier.toLowerCase() }
-    );
+    const record = await OtpVerification.findOne(query);
 
     if (!record || record.otp !== otp.trim()) {
       return res.status(400).json({ message: 'Invalid OTP code. Please enter the correct 6-digit OTP.' });
@@ -332,10 +320,10 @@ exports.verifyOtpOnly = async (req, res, next) => {
 exports.resetPassword = async (req, res, next) => {
   try {
     const { phone, email, newPassword } = req.body;
-    const identifier = (phone || email || '').trim();
+    const identifier = (email || phone || '').trim();
 
     if (!identifier || !newPassword) {
-      return res.status(400).json({ message: 'Phone/Email and new password are required' });
+      return res.status(400).json({ message: 'Email and new password are required' });
     }
 
     if (newPassword.length < 6) {
@@ -351,23 +339,19 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
-    const cleanDigits = identifier.replace(/[^0-9]/g, '');
-    const last10 = cleanDigits.slice(-10);
-
-    const orConditions = [];
-    if (cleanDigits.length >= 7) {
-      orConditions.push({ phone: identifier });
-      orConditions.push({ phone: cleanDigits });
-      orConditions.push({ phone: { $regex: last10 + '$' } });
-    }
+    let query;
     if (identifier.includes('@') || email) {
-      orConditions.push({ email: identifier.toLowerCase() });
+      query = { email: identifier.toLowerCase(), verified: true };
+    } else {
+      const cleanDigits = identifier.replace(/[^0-9]/g, '');
+      const last10 = cleanDigits.slice(-10);
+      query = {
+        $or: [{ phone: identifier }, { phone: cleanDigits }, { phone: { $regex: last10 + '$' } }],
+        verified: true
+      };
     }
 
-    const record = await OtpVerification.findOne({
-      ...(orConditions.length > 0 ? { $or: orConditions } : { email: identifier.toLowerCase() }),
-      verified: true
-    });
+    const record = await OtpVerification.findOne(query);
 
     if (!record) {
       return res.status(403).json({ message: 'Please verify the OTP before setting a new password' });
@@ -377,13 +361,13 @@ exports.resetPassword = async (req, res, next) => {
       return res.status(400).json({ message: 'Verification session expired. Please request OTP again.' });
     }
 
-    const studentConditions = [];
-    if (record.phone) studentConditions.push({ phone: record.phone });
-    if (record.email) studentConditions.push({ email: record.email });
-
-    const student = await Student.findOne(
-      studentConditions.length > 0 ? { $or: studentConditions } : { email: record.email }
-    );
+    // Strictly match the student by their verified email address!
+    let student = null;
+    if (record.email) {
+      student = await Student.findOne({ email: record.email.toLowerCase() });
+    } else if (record.phone) {
+      student = await Student.findOne({ phone: record.phone });
+    }
 
     if (!student) {
       return res.status(404).json({ message: 'Student account not found' });
@@ -408,27 +392,23 @@ exports.resetPassword = async (req, res, next) => {
 exports.verifyForgotPassword = async (req, res, next) => {
   try {
     const { email, phone, otp, newPassword } = req.body;
-    const identifier = (phone || email || '').trim();
+    const identifier = (email || phone || '').trim();
     if (!identifier || !otp || !newPassword) {
-      return res.status(400).json({ message: 'Phone/Email, OTP, and new password are required' });
+      return res.status(400).json({ message: 'Email, OTP, and new password are required' });
     }
 
-    const cleanDigits = identifier.replace(/[^0-9]/g, '');
-    const last10 = cleanDigits.slice(-10);
-
-    const orConditions = [];
-    if (cleanDigits.length >= 7) {
-      orConditions.push({ phone: identifier });
-      orConditions.push({ phone: cleanDigits });
-      orConditions.push({ phone: { $regex: last10 + '$' } });
-    }
+    let query;
     if (identifier.includes('@') || email) {
-      orConditions.push({ email: identifier.toLowerCase() });
+      query = { email: identifier.toLowerCase() };
+    } else {
+      const cleanDigits = identifier.replace(/[^0-9]/g, '');
+      const last10 = cleanDigits.slice(-10);
+      query = {
+        $or: [{ phone: identifier }, { phone: cleanDigits }, { phone: { $regex: last10 + '$' } }]
+      };
     }
 
-    const record = await OtpVerification.findOne(
-      orConditions.length > 0 ? { $or: orConditions } : { email: identifier.toLowerCase() }
-    );
+    const record = await OtpVerification.findOne(query);
 
     if (!record || record.otp !== otp.trim()) {
       return res.status(400).json({ message: 'Invalid OTP' });
@@ -438,12 +418,12 @@ exports.verifyForgotPassword = async (req, res, next) => {
       return res.status(400).json({ message: 'OTP has expired' });
     }
 
-    const student = await Student.findOne({
-      $or: [
-        { phone: record.phone },
-        { email: record.email }
-      ]
-    });
+    let student = null;
+    if (record.email) {
+      student = await Student.findOne({ email: record.email.toLowerCase() });
+    } else if (record.phone) {
+      student = await Student.findOne({ phone: record.phone });
+    }
 
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
