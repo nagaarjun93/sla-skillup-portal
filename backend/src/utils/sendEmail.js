@@ -17,19 +17,22 @@ function getTransporter() {
     return null;
   }
 
-  // Force IPv4 and port 587 with STARTTLS to prevent IPv6 ENETUNREACH errors on cloud hosts like Render
+  // Force IPv4 resolution and port 587 with STARTTLS to prevent IPv6 ENETUNREACH errors on cloud hosts like Render
   transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
     requireTLS: true,
-    family: 4,
     auth: {
       user,
       pass,
     },
     tls: {
       rejectUnauthorized: false,
+      servername: 'smtp.gmail.com',
+    },
+    lookup: (hostname, options, callback) => {
+      return dns.lookup(hostname, { family: 4 }, callback);
     },
   });
 
