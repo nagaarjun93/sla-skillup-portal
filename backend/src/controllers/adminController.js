@@ -351,11 +351,16 @@ exports.getManageQuestions = async (req, res, next) => {
     }
 
     // Fetch dynamic options for filters
-    const [topicCategories, distinctTopics, weeklyTests, mockModels] = await Promise.all([
+    const [topicCategories, distinctTopics, weeklyTests, mockModels, topicSummaries] = await Promise.all([
       Question.distinct('category', { weeklyTestId: null }),
       Question.distinct('topic', { weeklyTestId: null }),
       WeeklyTest.find().select('_id title weekName weekNumber topic totalQuestions').sort({ weekNumber: -1 }),
-      MockQuestion.distinct('modelSet')
+      MockQuestion.distinct('modelSet'),
+      Question.aggregate([
+        { $match: { weeklyTestId: null } },
+        { $group: { _id: '$topic', count: { $sum: 1 }, category: { $first: '$category' } } },
+        { $sort: { count: -1 } }
+      ])
     ]);
 
     res.json({
@@ -369,7 +374,12 @@ exports.getManageQuestions = async (req, res, next) => {
         categories: topicCategories.filter(Boolean),
         topics: distinctTopics.filter(Boolean),
         weeklyTests,
-        mockModels: mockModels.filter(Boolean)
+        mockModels: mockModels.filter(Boolean),
+        topicSummaries: topicSummaries.filter(t => t._id).map(t => ({
+          topic: t._id,
+          count: t.count,
+          category: t.category
+        }))
       }
     });
   } catch (error) {
@@ -420,31 +430,61 @@ exports.bulkDeleteQuestions = async (req, res, next) => {
 // POST /api/admin/questions/delete-by-scope
 exports.deleteQuestionsByScope = async (req, res, next) => {
   try {
-    const { scope, topic, category, weeklyTestId, modelSet } = req.body;
+    const { scope, topic, category, weeklyTestId, modelSet, deleteLatestBatch, deleteTestDoc } = req.body;
     let deletedCount = 0;
+    let customMessage = '';
 
     if (scope === 'mock') {
       if (!modelSet) return res.status(400).json({ message: 'Model set required' });
       const result = await MockQuestion.deleteMany({ modelSet });
       deletedCount = result.deletedCount;
+      customMessage = `Successfully deleted all ${deletedCount} questions for Mock Model Set "${modelSet}"`;
     } else if (scope === 'weekly') {
       if (!weeklyTestId) return res.status(400).json({ message: 'Weekly test ID required' });
+      const testDoc = await WeeklyTest.findById(weeklyTestId);
+      const testName = testDoc ? (testDoc.title || testDoc.weekName || `Week ${testDoc.weekNumber}`) : 'Weekly Test';
+
       const result = await Question.deleteMany({ weeklyTestId });
       deletedCount = result.deletedCount;
-      await WeeklyTest.findByIdAndUpdate(weeklyTestId, { totalQuestions: 0 });
+
+      if (deleteTestDoc) {
+        await WeeklyTest.findByIdAndDelete(weeklyTestId);
+        customMessage = `Successfully deleted ${testName} and all its ${deletedCount} questions!`;
+      } else {
+        await WeeklyTest.findByIdAndUpdate(weeklyTestId, { totalQuestions: 0 });
+        customMessage = `Successfully deleted all ${deletedCount} questions from ${testName}. The test is now empty.`;
+      }
     } else if (scope === 'topic') {
       if (!topic && !category) return res.status(400).json({ message: 'Topic or category required' });
       const filter = { weeklyTestId: null };
       if (topic) filter.topic = topic;
       if (category) filter.category = category;
-      const result = await Question.deleteMany(filter);
-      deletedCount = result.deletedCount;
+
+      if (deleteLatestBatch) {
+        // Delete only the latest uploaded batch for this topic
+        const latestQ = await Question.findOne(filter).sort({ createdAt: -1 });
+        if (latestQ && latestQ.uploadBatchId) {
+          filter.uploadBatchId = latestQ.uploadBatchId;
+        } else if (latestQ) {
+          const windowStart = new Date(new Date(latestQ.createdAt).getTime() - 15 * 60 * 1000);
+          filter.createdAt = { $gte: windowStart };
+        }
+        const result = await Question.deleteMany(filter);
+        deletedCount = result.deletedCount;
+        customMessage = `Successfully undone/deleted ${deletedCount} questions from the latest upload of "${topic || category}". Earlier questions remain intact.`;
+      } else {
+        // Total delete: delete all questions for this topic
+        const result = await Question.deleteMany(filter);
+        deletedCount = result.deletedCount;
+        customMessage = `Successfully deleted all ${deletedCount} questions for topic "${topic || category}".`;
+      }
     } else {
       return res.status(400).json({ message: 'Invalid scope specified' });
     }
 
     res.json({
-      message: `Successfully deleted ${deletedCount} question(s) from ${scope}`,
+      success: true,
+      message: customMessage || `Successfully deleted ${deletedCount} question(s) from ${scope}`,
       deletedCount
     });
   } catch (error) {

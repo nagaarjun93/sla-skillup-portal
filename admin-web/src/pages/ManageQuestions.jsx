@@ -13,7 +13,10 @@ import {
   Target,
   CheckCircle2,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Undo2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export default function ManageQuestions() {
@@ -39,8 +42,12 @@ export default function ManageQuestions() {
     categories: [],
     topics: [],
     weeklyTests: [],
-    mockModels: []
+    mockModels: [],
+    topicSummaries: []
   });
+
+  // Collapsible batch delete hub
+  const [showBatchHub, setShowBatchHub] = useState(true);
 
   // Selected checkboxes (Set of IDs)
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -227,6 +234,63 @@ export default function ManageQuestions() {
     }
   };
 
+  // Delete Entire Weekly Test (All Questions or Entire Test Record)
+  const handleDeleteWeeklyTest = async (testId, testName, deleteDoc = false) => {
+    const confirmPrompt = deleteDoc
+      ? `⚠️ DELETE ENTIRE WEEKLY TEST RECORD & QUESTIONS\n\nAre you sure you want to permanently delete "${testName}" along with all of its questions from MongoDB?\n\nThis cannot be undone.`
+      : `⚠️ DELETE ALL QUESTIONS FOR ${testName.toUpperCase()}\n\nAre you sure you want to delete all uploaded questions for this week?\n\nThe Weekly Test itself will remain with 0 questions.`;
+
+    if (!window.confirm(confirmPrompt)) return;
+
+    setIsDeleting(true);
+    try {
+      const res = await api.post('/admin/questions/delete-by-scope', {
+        scope: 'weekly',
+        weeklyTestId: testId,
+        deleteTestDoc: deleteDoc
+      });
+      showStatus('success', res.data.message || `Deleted weekly test questions successfully`);
+      setSelectedIds(new Set());
+      if (selectedWeeklyTest === testId && deleteDoc) {
+        setSelectedWeeklyTest('');
+      }
+      fetchQuestions();
+    } catch (err) {
+      console.error('Delete weekly test error:', err);
+      showStatus('error', err.response?.data?.message || 'Failed to delete weekly test questions');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Delete Topic Questions (All or Just Latest Upload Batch)
+  const handleDeleteTopicScope = async (topicName, categoryName, isLatestBatchOnly = false) => {
+    const targetLabel = topicName || categoryName || 'selected topic';
+    const confirmPrompt = isLatestBatchOnly
+      ? `⚡ UNDO / DELETE LATEST UPLOAD FOR "${targetLabel.toUpperCase()}"\n\nAre you sure you want to delete ONLY the most recently uploaded batch of questions for this topic?\n\nEarlier questions will NOT be deleted.`
+      : `⚠️ DELETE ALL QUESTIONS FOR "${targetLabel.toUpperCase()}"\n\nAre you sure you want to permanently delete ALL questions for this topic?\n\nAll questions under this topic will be erased immediately.`;
+
+    if (!window.confirm(confirmPrompt)) return;
+
+    setIsDeleting(true);
+    try {
+      const res = await api.post('/admin/questions/delete-by-scope', {
+        scope: 'topic',
+        topic: topicName || undefined,
+        category: categoryName || undefined,
+        deleteLatestBatch: isLatestBatchOnly
+      });
+      showStatus('success', res.data.message || `Deleted topic questions successfully`);
+      setSelectedIds(new Set());
+      fetchQuestions();
+    } catch (err) {
+      console.error('Delete topic scope error:', err);
+      showStatus('error', err.response?.data?.message || 'Failed to delete topic questions');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const isAllSelected = questions.length > 0 && selectedIds.size === questions.length;
 
   return (
@@ -340,6 +404,211 @@ export default function ManageQuestions() {
           <span>🎯 Mock Test Questions</span>
         </button>
       </div>
+
+      {/* ── BATCH & TOTAL DELETION HUB (Week-by-Week & Topic Uploads) ── */}
+      {activeTab === 'weekly' && (filterOptions.weeklyTests || []).length > 0 && (
+        <div className="card" style={{ marginBottom: '20px', padding: '16px 20px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showBatchHub ? '14px' : '0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={18} color="#14217f" />
+              <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#1e293b', margin: 0 }}>
+                📅 Weekly Tests Total Deletion Hub ({(filterOptions.weeklyTests || []).length} Tests Configured)
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBatchHub(!showBatchHub)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '700' }}
+            >
+              <span>{showBatchHub ? 'Hide Weekly Hub' : 'Show Weekly Hub'}</span>
+              {showBatchHub ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+
+          {showBatchHub && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+              {(filterOptions.weeklyTests || []).map((wt) => (
+                <div
+                  key={wt._id}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>
+                        {wt.title || wt.weekName || `Week ${wt.weekNumber}`}
+                      </strong>
+                      <span style={{ fontSize: '11px', backgroundColor: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
+                        {wt.totalQuestions || 0} Qs
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0' }}>
+                      Topic: {wt.topic || 'Weekly Exam'}
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWeeklyTest(wt._id, wt.title || wt.weekName || `Week ${wt.weekNumber}`, false)}
+                      disabled={isDeleting || !wt.totalQuestions}
+                      title="Delete all uploaded questions in this week (resets question count to 0)"
+                      style={{
+                        flex: 1,
+                        backgroundColor: wt.totalQuestions ? '#fee2e2' : '#f1f5f9',
+                        color: wt.totalQuestions ? '#991b1b' : '#94a3b8',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: wt.totalQuestions ? 'pointer' : 'default',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete All Qs</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWeeklyTest(wt._id, wt.title || wt.weekName || `Week ${wt.weekNumber}`, true)}
+                      disabled={isDeleting}
+                      title="Delete entire weekly test document from database"
+                      style={{
+                        backgroundColor: '#fff1f2',
+                        color: '#be123c',
+                        border: '1px solid #fecdd3',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span>Delete Test</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'topic' && (filterOptions.topicSummaries || []).length > 0 && (
+        <div className="card" style={{ marginBottom: '20px', padding: '16px 20px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showBatchHub ? '14px' : '0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Layers size={18} color="#14217f" />
+              <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#1e293b', margin: 0 }}>
+                📚 Topic Uploads & Total Deletion Hub ({(filterOptions.topicSummaries || []).length} Topics with Questions)
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBatchHub(!showBatchHub)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '700' }}
+            >
+              <span>{showBatchHub ? 'Hide Topics Hub' : 'Show Topics Hub'}</span>
+              {showBatchHub ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+
+          {showBatchHub && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+              {(filterOptions.topicSummaries || []).map((t) => (
+                <div
+                  key={t.topic}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>{t.topic}</strong>
+                      <span style={{ fontSize: '11px', backgroundColor: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
+                        {t.count} Qs
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0' }}>
+                      Category: {t.category || 'General'}
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTopicScope(t.topic, t.category, true)}
+                      disabled={isDeleting || !t.count}
+                      title="Undo / delete only the latest uploaded batch for this topic (preserves older questions)"
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#fffbeb',
+                        color: '#b45309',
+                        border: '1px solid #fde68a',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: t.count ? 'pointer' : 'default',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Undo2 size={13} />
+                      <span>Undo Latest</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTopicScope(t.topic, t.category, false)}
+                      disabled={isDeleting || !t.count}
+                      title="Delete ALL questions in this topic"
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#fee2e2',
+                        color: '#991b1b',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: t.count ? 'pointer' : 'default',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete All Qs</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter & Action Card */}
       <div className="card" style={{ marginBottom: '20px', padding: '18px 20px' }}>
@@ -525,10 +794,114 @@ export default function ManageQuestions() {
               </button>
             )}
 
-            {/* Scope Delete Button */}
-            {((activeTab === 'topic' && (selectedTopic || selectedCategory)) ||
-              (activeTab === 'weekly' && selectedWeeklyTest) ||
-              (activeTab === 'mock' && selectedModelSet)) && (
+            {/* Scope Delete Buttons for Topic */}
+            {activeTab === 'topic' && (selectedTopic || selectedCategory) && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTopicScope(selectedTopic, selectedCategory, true)}
+                  disabled={isDeleting}
+                  title="Undo / delete only the latest uploaded batch of questions for this topic"
+                  style={{
+                    backgroundColor: '#fffbeb',
+                    color: '#b45309',
+                    border: '1px solid #fde68a',
+                    borderRadius: '6px',
+                    padding: '8px 14px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Undo2 size={15} />
+                  <span>Undo Latest Upload</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTopicScope(selectedTopic, selectedCategory, false)}
+                  disabled={isDeleting}
+                  style={{
+                    backgroundColor: '#fff1f2',
+                    color: '#be123c',
+                    border: '1px solid #fecdd3',
+                    borderRadius: '6px',
+                    padding: '8px 14px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <AlertTriangle size={15} />
+                  <span>Delete All Qs in {selectedTopic || selectedCategory}</span>
+                </button>
+              </>
+            )}
+
+            {/* Scope Delete Buttons for Weekly Test */}
+            {activeTab === 'weekly' && selectedWeeklyTest && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const wt = filterOptions.weeklyTests.find(w => w._id === selectedWeeklyTest);
+                    handleDeleteWeeklyTest(selectedWeeklyTest, wt?.title || wt?.weekName || 'This Weekly Test', false);
+                  }}
+                  disabled={isDeleting}
+                  title="Delete all questions in this week (resets question count to 0)"
+                  style={{
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    border: '1px solid #fca5a5',
+                    borderRadius: '6px',
+                    padding: '8px 14px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Trash2 size={15} />
+                  <span>Delete All Qs in This Week</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const wt = filterOptions.weeklyTests.find(w => w._id === selectedWeeklyTest);
+                    handleDeleteWeeklyTest(selectedWeeklyTest, wt?.title || wt?.weekName || 'This Weekly Test', true);
+                  }}
+                  disabled={isDeleting}
+                  title="Permanently remove entire weekly test document"
+                  style={{
+                    backgroundColor: '#fff1f2',
+                    color: '#be123c',
+                    border: '1px solid #fecdd3',
+                    borderRadius: '6px',
+                    padding: '8px 14px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>Delete Test Record</span>
+                </button>
+              </>
+            )}
+
+            {/* Scope Delete Button for Mock Models */}
+            {activeTab === 'mock' && selectedModelSet && (
               <button
                 type="button"
                 onClick={handleDeleteCurrentScope}
@@ -548,7 +921,7 @@ export default function ManageQuestions() {
                 }}
               >
                 <AlertTriangle size={15} />
-                <span>Delete All in This {activeTab === 'topic' ? 'Topic' : activeTab === 'weekly' ? 'Test' : 'Model'}</span>
+                <span>Delete All in {selectedModelSet}</span>
               </button>
             )}
           </div>

@@ -146,3 +146,4 @@ async function sendOtpEmail({ toEmail, studentName, otp }) {
 module.exports = {
   sendOtpEmail,
 };
+
