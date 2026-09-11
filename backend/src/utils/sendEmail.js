@@ -1,26 +1,14 @@
-const dns = require('dns');
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder('ipv4first');
-}
 const nodemailer = require('nodemailer');
 
-async function resolveGmailIpv4() {
-  return new Promise((resolve) => {
-    dns.resolve4('smtp.gmail.com', (err, addresses) => {
-      if (!err && addresses && addresses.length > 0) {
-        return resolve(addresses[0]);
-      }
-      dns.lookup('smtp.gmail.com', { family: 4 }, (err2, address) => {
-        if (!err2 && address) {
-          return resolve(address);
-        }
-        resolve('smtp.gmail.com');
-      });
-    });
-  });
-}
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyMEm3LHMelKg0RW7HbguqdbCK_RYIKMHFA_7lg1QKuQrJRbIxLy7heTtDIDNj3Tlu1GA/exec';
+const GOOGLE_SCRIPT_SECRET = process.env.GOOGLE_SCRIPT_SECRET || 'sla_skillup_otp_2026';
 
-async function getTransporter() {
+// Reusable transporter for fallback SMTP
+let transporter = null;
+
+function getTransporter() {
+  if (transporter) return transporter;
+
   const user = process.env.EMAIL_USER || 'nknagaarjun7@gmail.com';
   const pass = process.env.EMAIL_PASS || 'vcqukzrxfmsvjtre';
 
@@ -28,11 +16,8 @@ async function getTransporter() {
     return null;
   }
 
-  // Resolve direct IPv4 to completely prevent Render Linux from attempting IPv6 (which causes ENETUNREACH)
-  const hostIp = await resolveGmailIpv4();
-
-  return nodemailer.createTransport({
-    host: hostIp,
+  transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
     port: 587,
     secure: false,
     requireTLS: true,
@@ -41,10 +26,52 @@ async function getTransporter() {
       pass,
     },
     tls: {
-      servername: 'smtp.gmail.com',
       rejectUnauthorized: false,
+      servername: 'smtp.gmail.com',
     },
   });
+
+  return transporter;
+}
+
+/**
+ * Send email via Google Apps Script HTTPS Relay (Port 443 - 100% works on Render free tier)
+ */
+async function sendViaGoogleRelay({ toEmail, subject, text, html }) {
+  if (!GOOGLE_SCRIPT_URL) return null;
+
+  try {
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify({
+        secret: GOOGLE_SCRIPT_SECRET,
+        to: toEmail,
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    const responseText = await res.text();
+    let data = {};
+    try {
+      data = JSON.parse(responseText);
+    } catch (_) {}
+
+    if (res.ok && (data.success || responseText.includes('successfully'))) {
+      console.log(`[EMAIL SERVICE] ✅ Google Relay: OTP email successfully delivered to ${toEmail}`);
+      return { success: true, messageId: `google-relay-${Date.now()}` };
+    } else {
+      console.warn(`[EMAIL SERVICE] ⚠️ Google Relay warning: ${data.error || responseText}`);
+      return null;
+    }
+  } catch (err) {
+    console.error(`[EMAIL SERVICE] ⚠️ Google Relay error:`, err.message);
+    return null;
+  }
 }
 
 /**
@@ -56,15 +83,6 @@ async function getTransporter() {
  * @returns {Promise<{success: boolean, messageId?: string, devMode?: boolean}>}
  */
 async function sendOtpEmail({ toEmail, studentName, otp }) {
-  const mailTransporter = await getTransporter();
-
-  // If email credentials not yet provided in .env, throw explicit error
-  if (!mailTransporter) {
-    const errorMsg = 'SMTP email credentials (EMAIL_USER & EMAIL_PASS) are not configured in backend/.env. Real email could not be sent.';
-    console.error(`[EMAIL SERVICE] ❌ ${errorMsg}`);
-    throw new Error(errorMsg);
-  }
-
   const user = process.env.EMAIL_USER || 'nknagaarjun7@gmail.com';
   const fromAddress = process.env.EMAIL_FROM || `"SLA SkillUp Portal" <${user}>`;
   const nameDisplay = studentName ? `Hello ${studentName},` : 'Hello,';
@@ -149,12 +167,33 @@ async function sendOtpEmail({ toEmail, studentName, otp }) {
 </html>
   `;
 
+  const subject = `Your SLA SkillUp Password Reset OTP: ${otp}`;
+  const text = `Hello,\n\nYour SLA SkillUp password reset OTP is: ${otp}\n\nThis code is valid for 15 minutes.\nIf you did not request this code, please ignore this email.\n\n- SLA SkillUp Team`;
+
+  // 1. Try Google Apps Script HTTPS Relay first (Port 443 - 100% supported on Render free tier)
+  const relayResult = await sendViaGoogleRelay({
+    toEmail,
+    subject,
+    text,
+    html: htmlContent,
+  });
+
+  if (relayResult && relayResult.success) {
+    return relayResult;
+  }
+
+  // 2. Fallback to direct SMTP
+  const mailTransporter = getTransporter();
+  if (!mailTransporter) {
+    throw new Error('Email delivery failed: Neither Google Relay nor SMTP credentials could send the email.');
+  }
+
   const mailOptions = {
     from: fromAddress,
     to: toEmail,
-    subject: `Your SLA SkillUp Password Reset OTP: ${otp}`,
+    subject,
     html: htmlContent,
-    text: `Hello,\n\nYour SLA SkillUp password reset OTP is: ${otp}\n\nThis code is valid for 15 minutes.\nIf you did not request this code, please ignore this email.\n\n- SLA SkillUp Team`,
+    text,
   };
 
   const info = await mailTransporter.sendMail(mailOptions);
