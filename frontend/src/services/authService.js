@@ -16,8 +16,10 @@ export const authService = {
     return response.data;
   },
 
-  requestForgotPassword: async (email) => {
-    const response = await api.post('/students/forgot-password/request', { email });
+  requestForgotPassword: async (identifier) => {
+    const isEmail = typeof identifier === 'string' && identifier.includes('@');
+    const payload = isEmail ? { email: identifier } : { phone: identifier };
+    const response = await api.post('/students/forgot-password/request', payload);
     return response.data;
   },
 
@@ -26,13 +28,17 @@ export const authService = {
     return response.data;
   },
 
-  verifyOtpOnly: async (phone, otp) => {
-    const response = await api.post('/students/forgot-password/verify-otp', { phone, otp });
+  verifyOtpOnly: async (identifier, otp) => {
+    const isEmail = typeof identifier === 'string' && identifier.includes('@');
+    const payload = isEmail ? { email: identifier, otp } : { phone: identifier, otp };
+    const response = await api.post('/students/forgot-password/verify-otp', payload);
     return response.data;
   },
 
-  resetPasswordAfterOtp: async (phone, newPassword) => {
-    const response = await api.post('/students/forgot-password/reset-password', { phone, newPassword });
+  resetPasswordAfterOtp: async (identifier, newPassword) => {
+    const isEmail = typeof identifier === 'string' && identifier.includes('@');
+    const payload = isEmail ? { email: identifier, newPassword } : { phone: identifier, newPassword };
+    const response = await api.post('/students/forgot-password/reset-password', payload);
     return response.data;
   },
 

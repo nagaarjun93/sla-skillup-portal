@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const Admin = require('../models/Admin');
 const OtpVerification = require('../models/OtpVerification');
 const { generateToken } = require('../utils/jwt');
+const { sendOtpEmail } = require('../utils/sendEmail');
 
 // POST /api/students/register
 exports.registerStudent = async (req, res, next) => {
@@ -212,14 +213,14 @@ exports.requestForgotPassword = async (req, res, next) => {
 
     // Upsert verification record
     const orQuery = [];
+    if (student.email) orQuery.push({ email: student.email.toLowerCase() });
     if (student.phone) orQuery.push({ phone: student.phone });
-    if (student.email) orQuery.push({ email: student.email });
 
     await OtpVerification.findOneAndUpdate(
       orQuery.length > 0 ? { $or: orQuery } : { email: student.email },
       {
         phone: student.phone || '',
-        email: student.email || '',
+        email: student.email ? student.email.toLowerCase() : '',
         otp,
         expiryTime,
         verified: false
@@ -227,14 +228,43 @@ exports.requestForgotPassword = async (req, res, next) => {
       { upsert: true, new: true }
     );
 
+    // Send real email OTP via Nodemailer
+    let emailSent = false;
+    if (student.email) {
+      try {
+        await sendOtpEmail({
+          toEmail: student.email,
+          studentName: student.name,
+          otp,
+        });
+        emailSent = true;
+      } catch (mailErr) {
+        console.error('[EMAIL ERROR] Failed sending OTP email:', mailErr);
+      }
+    }
+
+    let maskedEmail = '';
+    if (student.email && student.email.includes('@')) {
+      const parts = student.email.split('@');
+      const prefix = parts[0];
+      const domain = parts[1];
+      maskedEmail = `${prefix.slice(0, Math.min(2, prefix.length))}***@${domain}`;
+    }
+
     const maskedPhone = student.phone
       ? `${student.phone.slice(0, 2)}******${student.phone.slice(-2)}`
-      : 'registered mobile';
+      : '';
+
+    const targetInfo = maskedEmail || maskedPhone || 'your registered account';
 
     res.json({
-      message: `OTP sent successfully to registered phone ${maskedPhone}`,
-      phone: student.phone,
+      success: true,
+      message: `OTP sent successfully to ${targetInfo}`,
       email: student.email,
+      phone: student.phone,
+      maskedEmail,
+      maskedPhone,
+      emailSent,
       otp // for convenient dev & testing
     });
   } catch (error) {
