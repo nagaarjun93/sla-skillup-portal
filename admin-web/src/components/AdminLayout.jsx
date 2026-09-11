@@ -56,7 +56,8 @@ export default function AdminLayout() {
       case '/upload-questions': return 'Weekly Test Question Upload';
       case '/weekly-tests': return 'Weekly Tests Schedule';
       case '/this-week-questions': return "This Week's Test Questions";
-      case '/students': return 'Student & Mock Test Access';
+      case '/students':
+      case '/student-details': return 'Student Details & Management';
       case '/results': return 'Weekly Test Results & Marking';
       case '/mock-settings': return 'Mock Test Question Upload';
       case '/mock-results': return 'Mock Test Results';
@@ -137,7 +138,7 @@ export default function AdminLayout() {
             onClick={() => setMobileNavOpen(false)}
           >
             <Users />
-            <span>Student & Mock Test Access</span>
+            <span>Student Details & Access</span>
           </NavLink>
           <NavLink
             to="/results"

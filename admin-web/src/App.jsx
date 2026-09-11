@@ -54,6 +54,7 @@ export default function App() {
             <Route path="weekly-tests" element={<WeeklyTests />} />
             <Route path="this-week-questions" element={<ThisWeekQuestions />} />
             <Route path="students" element={<StudentManagement />} />
+            <Route path="student-details" element={<StudentManagement />} />
             <Route path="results" element={<TestResults />} />
             <Route path="mock-settings" element={<MockTestSettings />} />
             <Route path="mock-results" element={<MockTestResults />} />

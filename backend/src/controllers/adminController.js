@@ -6,6 +6,7 @@ const WeeklyTest = require('../models/WeeklyTest');
 const StudentMockAccess = require('../models/StudentMockAccess');
 const { parseUniversalQuestions, parseCsvQuestions, parseTextQuestions } = require('../services/fileParserService');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
 // --- Question Management ---
 
@@ -724,14 +725,121 @@ exports.getStudentDetails = async (req, res, next) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const results = await Result.find({ student: student._id }).populate('weeklyTestId');
+    const results = await Result.find({ student: student._id })
+      .populate('weeklyTestId', 'title weekName')
+      .sort({ submittedAt: -1 });
     const mockAccess = await StudentMockAccess.findOne({ studentId: student._id });
+
+    const totalTests = results.length;
+    const passedTests = results.filter(r => r.isPassed).length;
+    const totalScore = results.reduce((acc, r) => acc + (r.score || 0), 0);
+    const totalPossible = results.reduce((acc, r) => acc + (r.total || 0), 0);
+    const averageAccuracy = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
 
     res.json({
       student,
       results,
-      mockAccess: mockAccess ? mockAccess.accessEnabled : false
+      stats: {
+        totalTests,
+        passedTests,
+        failedTests: totalTests - passedTests,
+        averageAccuracy
+      },
+      mockAccess: mockAccess ? mockAccess.accessEnabled : (student.mockTestAllowed || false)
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PUT /api/admin/students/:id
+exports.updateStudent = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      email,
+      phone,
+      courseName,
+      trainerName,
+      status,
+      mockTestAllowed,
+      assignedMockModel,
+      newPassword
+    } = req.body;
+
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (email && email.toLowerCase().trim() !== student.email) {
+      const existingEmail = await Student.findOne({ email: email.toLowerCase().trim(), _id: { $ne: id } });
+      if (existingEmail) {
+        return res.status(400).json({ message: 'Another student already has this email address' });
+      }
+      student.email = email.toLowerCase().trim();
+    }
+
+    if (name !== undefined && name.trim()) student.name = name.trim();
+    if (phone !== undefined) student.phone = phone ? phone.trim() : '';
+    if (courseName !== undefined) student.courseName = courseName ? courseName.trim() : '';
+    if (trainerName !== undefined) student.trainerName = trainerName ? trainerName.trim() : '';
+
+    if (status !== undefined) {
+      if (!['ACTIVE', 'INACTIVE'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be ACTIVE or INACTIVE' });
+      }
+      student.status = status;
+    }
+
+    if (mockTestAllowed !== undefined) {
+      const isAllowed = Boolean(mockTestAllowed);
+      student.mockTestAllowed = isAllowed;
+      await StudentMockAccess.findOneAndUpdate(
+        { studentId: student._id },
+        { accessEnabled: isAllowed },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (assignedMockModel !== undefined && assignedMockModel.trim()) {
+      student.assignedMockModel = assignedMockModel.trim();
+    }
+
+    if (newPassword && newPassword.trim().length > 0) {
+      if (newPassword.trim().length < 4) {
+        return res.status(400).json({ message: 'New password must be at least 4 characters long' });
+      }
+      const salt = await bcrypt.genSalt(10);
+      student.password = await bcrypt.hash(newPassword.trim(), salt);
+    }
+
+    await student.save();
+
+    const updated = await Student.findById(id).select('-password');
+    res.json({
+      message: 'Student details updated successfully',
+      student: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DELETE /api/admin/students/:id
+exports.deleteStudent = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    await Student.findByIdAndDelete(id);
+    await StudentMockAccess.deleteMany({ studentId: id });
+
+    res.json({ message: 'Student account deleted successfully' });
   } catch (error) {
     next(error);
   }
@@ -760,3 +868,4 @@ exports.updateStudentStatus = async (req, res, next) => {
     next(error);
   }
 };
+

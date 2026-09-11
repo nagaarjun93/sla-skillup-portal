@@ -34,5 +34,7 @@ router.get('/students', adminController.getAllStudents);
 router.get('/students/management', adminController.getStudentManagement);
 router.get('/students/:id/details', adminController.getStudentDetails);
 router.put('/students/:id/status', adminController.updateStudentStatus);
+router.put('/students/:id', adminController.updateStudent);
+router.delete('/students/:id', adminController.deleteStudent);
 
 module.exports = router;
