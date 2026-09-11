@@ -161,10 +161,8 @@ export default function StudentForgotPasswordScreen() {
         <View style={styles.card}>
           <Text style={styles.formTitle}>Forgot Password</Text>
           <Text style={styles.subtitle}>
-            {step === 1 && (authMode === 'email'
-              ? 'Enter your registered email address to receive a 6-digit verification code'
-              : 'Enter your registered mobile number to receive a 6-digit verification code')}
-            {step === 2 && `Enter the 6-digit OTP code sent to ${maskedTarget || (authMode === 'email' ? email : phone)}`}
+            {step === 1 && 'Enter your registered email address to receive a 6-digit verification code'}
+            {step === 2 && `Enter the 6-digit OTP code sent to ${maskedTarget || email}`}
             {step === 3 && 'OTP verified! Set your new password to access your account'}
           </Text>
 
@@ -233,16 +231,14 @@ export default function StudentForgotPasswordScreen() {
             <View style={styles.stepBody}>
               <View style={styles.infoBanner}>
                 <Text style={styles.infoBannerTitle}>
-                  {authMode === 'email' ? '✉️ Verification Code Sent to Email' : '📱 OTP Sent to Mobile'}
+                  ✉️ Verification Code Sent to Email
                 </Text>
                 <Text style={styles.infoBannerSub}>
-                  {maskedTarget || (authMode === 'email' ? email : `+91 ${phone}`)}
+                  {maskedTarget || email}
                 </Text>
-                {authMode === 'email' && (
-                  <Text style={styles.infoBannerNote}>
-                    💡 Please check your Inbox and Spam/Junk folder if not visible in a few moments.
-                  </Text>
-                )}
+                <Text style={styles.infoBannerNote}>
+                  💡 Please check your Inbox and Spam/Junk folder if not visible in a few moments.
+                </Text>
               </View>
 
               <Text style={styles.label}>Enter 6-Digit Verification Code</Text>
@@ -273,7 +269,7 @@ export default function StudentForgotPasswordScreen() {
               <View style={styles.resendRow}>
                 <TouchableOpacity onPress={() => setStep(1)} activeOpacity={0.7}>
                   <Text style={styles.changePhoneText}>
-                    {authMode === 'email' ? 'Change Email Address' : 'Change Mobile Number'}
+                    Change Email Address
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleRequestOtp} activeOpacity={0.7} disabled={loading}>
@@ -291,7 +287,7 @@ export default function StudentForgotPasswordScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.verifiedTitle}>Account Verified Successfully</Text>
                   <Text style={styles.verifiedSub}>
-                    {maskedTarget || (authMode === 'email' ? email : phone)} is verified. Enter your new password below.
+                    {maskedTarget || email} is verified. Enter your new password below.
                   </Text>
                 </View>
               </View>
