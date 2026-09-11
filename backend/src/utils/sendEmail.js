@@ -6,9 +6,6 @@ let transporter = null;
 function getTransporter() {
   if (transporter) return transporter;
 
-  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.EMAIL_PORT, 10) || 465;
-  const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
   const user = process.env.EMAIL_USER || 'nknagaarjun7@gmail.com';
   const pass = process.env.EMAIL_PASS || 'vcqukzrxfmsvjtre';
 
@@ -16,15 +13,29 @@ function getTransporter() {
     return null;
   }
 
-  transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user,
-      pass,
-    },
-  });
+  // If host is Gmail or unset, use built-in 'gmail' service to prevent port 465 timeouts on cloud hosts like Render
+  if (!process.env.EMAIL_HOST || process.env.EMAIL_HOST.includes('gmail')) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user,
+        pass,
+      },
+    });
+  } else {
+    const host = process.env.EMAIL_HOST;
+    const port = parseInt(process.env.EMAIL_PORT, 10) || 587;
+    const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
+    transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: {
+        user,
+        pass,
+      },
+    });
+  }
 
   return transporter;
 }

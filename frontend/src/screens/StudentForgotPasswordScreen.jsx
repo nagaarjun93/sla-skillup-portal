@@ -79,8 +79,10 @@ export default function StudentForgotPasswordScreen() {
       );
       setStep(2);
     } catch (error) {
-      const msg = error.response?.data?.message || 'Account not found. Please check and try again.';
-      Alert.alert('Not Found', msg);
+      const isNotFound = error.response?.status === 404;
+      const msg = error.response?.data?.message || (isNotFound ? 'Registered account not found. Please check your email and try again.' : 'Unable to connect to server. Please try again in a moment.');
+      const title = isNotFound ? 'Not Found' : 'Notice';
+      Alert.alert(title, msg);
     } finally {
       setLoading(false);
     }
