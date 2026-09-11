@@ -93,7 +93,17 @@ exports.loginStudent = async (req, res, next) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const student = await Student.findOne({ email: email.toLowerCase() });
+    const identifier = (email || '').trim();
+    const cleanDigits = identifier.replace(/[^0-9]/g, '');
+
+    const searchCriteria = [{ email: identifier.toLowerCase() }];
+    if (cleanDigits.length >= 10) {
+      searchCriteria.push({ phone: identifier });
+      searchCriteria.push({ phone: cleanDigits });
+      searchCriteria.push({ phone: { $regex: cleanDigits.slice(-10) + '$' } });
+    }
+
+    const student = await Student.findOne({ $or: searchCriteria });
     if (!student) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
@@ -102,7 +112,11 @@ exports.loginStudent = async (req, res, next) => {
       return res.status(403).json({ message: 'Account is inactive. Please contact administrator.' });
     }
 
-    const isMatch = await bcrypt.compare(password, student.password);
+    let isMatch = await bcrypt.compare(password, student.password);
+    if (!isMatch && password.trim() !== password) {
+      isMatch = await bcrypt.compare(password.trim(), student.password);
+    }
+
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
