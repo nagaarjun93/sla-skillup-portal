@@ -8,9 +8,8 @@ function getTransporter() {
 
   const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT, 10) || 465;
-  const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+  const user = process.env.EMAIL_USER || 'nknagaarjun7@gmail.com';
+  const pass = process.env.EMAIL_PASS || 'vcqukzrxfmsvjtre';
 
   if (!user || !pass) {
     return null;
