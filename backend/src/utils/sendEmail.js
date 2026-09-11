@@ -1,3 +1,7 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 const nodemailer = require('nodemailer');
 
 // Initialize reusable transporter
@@ -13,29 +17,21 @@ function getTransporter() {
     return null;
   }
 
-  // If host is Gmail or unset, use built-in 'gmail' service to prevent port 465 timeouts on cloud hosts like Render
-  if (!process.env.EMAIL_HOST || process.env.EMAIL_HOST.includes('gmail')) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user,
-        pass,
-      },
-    });
-  } else {
-    const host = process.env.EMAIL_HOST;
-    const port = parseInt(process.env.EMAIL_PORT, 10) || 587;
-    const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
-    transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: {
-        user,
-        pass,
-      },
-    });
-  }
+  // Force IPv4 and port 587 with STARTTLS to prevent IPv6 ENETUNREACH errors on cloud hosts like Render
+  transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    family: 4,
+    auth: {
+      user,
+      pass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
 
   return transporter;
 }
@@ -58,7 +54,8 @@ async function sendOtpEmail({ toEmail, studentName, otp }) {
     throw new Error(errorMsg);
   }
 
-  const fromAddress = process.env.EMAIL_FROM || `"SLA SkillUp Portal" <${process.env.EMAIL_USER}>`;
+  const user = process.env.EMAIL_USER || 'nknagaarjun7@gmail.com';
+  const fromAddress = process.env.EMAIL_FROM || `"SLA SkillUp Portal" <${user}>`;
   const nameDisplay = studentName ? `Hello ${studentName},` : 'Hello,';
 
   const htmlContent = `
