@@ -4,12 +4,23 @@ if (dns.setDefaultResultOrder) {
 }
 const nodemailer = require('nodemailer');
 
-// Initialize reusable transporter
-let transporter = null;
+async function resolveGmailIpv4() {
+  return new Promise((resolve) => {
+    dns.resolve4('smtp.gmail.com', (err, addresses) => {
+      if (!err && addresses && addresses.length > 0) {
+        return resolve(addresses[0]);
+      }
+      dns.lookup('smtp.gmail.com', { family: 4 }, (err2, address) => {
+        if (!err2 && address) {
+          return resolve(address);
+        }
+        resolve('smtp.gmail.com');
+      });
+    });
+  });
+}
 
-function getTransporter() {
-  if (transporter) return transporter;
-
+async function getTransporter() {
   const user = process.env.EMAIL_USER || 'nknagaarjun7@gmail.com';
   const pass = process.env.EMAIL_PASS || 'vcqukzrxfmsvjtre';
 
@@ -17,9 +28,11 @@ function getTransporter() {
     return null;
   }
 
-  // Force IPv4 resolution and port 587 with STARTTLS to prevent IPv6 ENETUNREACH errors on cloud hosts like Render
-  transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
+  // Resolve direct IPv4 to completely prevent Render Linux from attempting IPv6 (which causes ENETUNREACH)
+  const hostIp = await resolveGmailIpv4();
+
+  return nodemailer.createTransport({
+    host: hostIp,
     port: 587,
     secure: false,
     requireTLS: true,
@@ -28,15 +41,10 @@ function getTransporter() {
       pass,
     },
     tls: {
-      rejectUnauthorized: false,
       servername: 'smtp.gmail.com',
-    },
-    lookup: (hostname, options, callback) => {
-      return dns.lookup(hostname, { family: 4 }, callback);
+      rejectUnauthorized: false,
     },
   });
-
-  return transporter;
 }
 
 /**
@@ -48,7 +56,7 @@ function getTransporter() {
  * @returns {Promise<{success: boolean, messageId?: string, devMode?: boolean}>}
  */
 async function sendOtpEmail({ toEmail, studentName, otp }) {
-  const mailTransporter = getTransporter();
+  const mailTransporter = await getTransporter();
 
   // If email credentials not yet provided in .env, throw explicit error
   if (!mailTransporter) {
